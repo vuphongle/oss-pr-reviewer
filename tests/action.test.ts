@@ -168,7 +168,7 @@ describe('GitHub Action security documentation', () => {
     expect(workflow).toMatch(/pull_request:/);
     expect(workflow).toMatch(/contents: read/);
     expect(workflow).toMatch(/pull-requests: read/);
-    expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.3\.0/);
+    expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.4\.0/);
     expect(workflow).not.toMatch(/pull_request_target/);
   });
 

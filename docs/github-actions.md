@@ -21,7 +21,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: vuphongle/oss-pr-reviewer@v0.3.0
+      - uses: vuphongle/oss-pr-reviewer@v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}

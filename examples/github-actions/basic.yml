@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run oss-pr-reviewer
-        uses: vuphongle/oss-pr-reviewer@v0.3.0
+        uses: vuphongle/oss-pr-reviewer@v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
