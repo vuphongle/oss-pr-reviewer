@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  OSS_PR_REVIEWER_MARKER,
-  findReviewComment,
-  publishReviewComment,
-} from '../src/github/comments.js';
+import { findReviewComment, publishReviewComment } from '../src/github/comments.js';
+import { OSS_PR_REVIEWER_MARKER } from '../src/github/comment-constants.js';
+import { MAX_REVIEW_COMMENT_CHARACTERS } from '../src/github/comment-safety.js';
 import type { RepositoryReference } from '../src/github/types.js';
 
 const reference: RepositoryReference = { owner: 'octo', repository: 'project' };
@@ -101,5 +99,21 @@ describe('PR comment publishing', () => {
     };
 
     await expect(findReviewComment(client, reference, 7)).rejects.toThrow(/comment API access/);
+  });
+
+  it('publishes a bounded, mention-safe comment body', async () => {
+    const client = {
+      listComments: vi.fn().mockResolvedValue([]),
+      createComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
+      updateComment: vi.fn(),
+    };
+    const report = `# PR Review Report\n\n### CRITICAL - Security\n${'@maintainer critical '.repeat(4000)}`;
+
+    await publishReviewComment(client, reference, 7, report);
+
+    const body = client.createComment.mock.calls[0][2] as string;
+    expect(body.length).toBeLessThanOrEqual(MAX_REVIEW_COMMENT_CHARACTERS);
+    expect(body).toContain('@\u200bmaintainer');
+    expect(body).toContain('shortened because the complete review exceeded');
   });
 });
