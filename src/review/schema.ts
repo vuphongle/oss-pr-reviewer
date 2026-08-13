@@ -32,7 +32,9 @@ export type ParsedReviewResult = z.infer<typeof reviewResultSchema>;
 export function parseReviewResult(value: unknown): ParsedReviewResult {
   const parsed = reviewResultSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`AI review response failed schema validation: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+    throw new Error(
+      `AI review response failed schema validation: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+    );
   }
   return parsed.data;
 }

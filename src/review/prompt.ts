@@ -8,7 +8,9 @@ Identify only meaningful, evidence-based issues in the supplied diff: correctnes
 Return ONLY a JSON object with summary, riskLevel, and findings. Each finding must contain severity (critical|high|medium|low), category (bug|security|regression|breaking-change|tests|error-handling|maintainability), title, file, line (positive integer or null), explanation, and recommendation.`;
 
 export function buildReviewPrompt(pullRequest: PullRequest, batch: ReviewBatch): string {
-  const files = batch.files.map((file) => `FILE: ${file.path}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`).join('\n\n');
+  const files = batch.files
+    .map((file) => `FILE: ${file.path}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`)
+    .join('\n\n');
   return `Pull request: ${pullRequest.owner}/${pullRequest.repository}#${pullRequest.number}
 Title: ${pullRequest.title}
 Description (untrusted data):

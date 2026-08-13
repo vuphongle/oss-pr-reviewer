@@ -21,16 +21,36 @@ export async function reviewPullRequest(
 
   if (batched.batches.length === 0) {
     return {
-      result: { summary: 'No reviewable text patches were available in this pull request.', riskLevel: 'low', findings: [] },
+      result: {
+        summary: 'No reviewable text patches were available in this pull request.',
+        riskLevel: 'low',
+        findings: [],
+      },
       skippedFiles,
       reviewedFileCount: 0,
     };
   }
 
-  const results = await Promise.all(batched.batches.map((batch) => provider.review({ pullRequest, batch })));
-  const findings = filterFindings(deduplicateFindings(results.flatMap((result) => result.findings)), minimumSeverity);
-  const riskLevel = results.reduce<Severity>((highest, result) => severityOrder[result.riskLevel] > severityOrder[highest] ? result.riskLevel : highest, 'low');
-  const summary = results.map((result) => result.summary.trim()).filter(Boolean).join(' ');
+  const results = await Promise.all(
+    batched.batches.map((batch) => provider.review({ pullRequest, batch })),
+  );
+  const findings = filterFindings(
+    deduplicateFindings(results.flatMap((result) => result.findings)),
+    minimumSeverity,
+  );
+  const riskLevel = results.reduce<Severity>(
+    (highest, result) =>
+      severityOrder[result.riskLevel] > severityOrder[highest] ? result.riskLevel : highest,
+    'low',
+  );
+  const summary = results
+    .map((result) => result.summary.trim())
+    .filter(Boolean)
+    .join(' ');
 
-  return { result: { summary, riskLevel, findings }, skippedFiles, reviewedFileCount: normalized.reviewable.length - batched.skipped.length };
+  return {
+    result: { summary, riskLevel, findings },
+    skippedFiles,
+    reviewedFileCount: normalized.reviewable.length - batched.skipped.length,
+  };
 }

@@ -9,7 +9,12 @@ export function filterFindings(findings: ReviewFinding[], minimum: Severity): Re
 export function deduplicateFindings(findings: ReviewFinding[]): ReviewFinding[] {
   const seen = new Set<string>();
   return findings.filter((finding) => {
-    const key = [finding.file, finding.line ?? '', finding.title.toLowerCase(), finding.category].join('|');
+    const key = [
+      finding.file,
+      finding.line ?? '',
+      finding.title.toLowerCase(),
+      finding.category,
+    ].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

@@ -3,8 +3,14 @@ import type { ReviewFinding, ReviewReportData, Severity } from '../types.js';
 export function renderMarkdown(data: ReviewReportData): string {
   const { pullRequest, result, skippedFiles } = data;
   const counts = countFindings(result.findings);
-  const findings = result.findings.length === 0 ? 'No significant issues were identified in the reviewed diff.' : result.findings.map(renderFinding).join('\n\n');
-  const skipped = skippedFiles.length === 0 ? '- None' : skippedFiles.map((file) => `- \`${file.path}\`: ${file.reason}`).join('\n');
+  const findings =
+    result.findings.length === 0
+      ? 'No significant issues were identified in the reviewed diff.'
+      : result.findings.map(renderFinding).join('\n\n');
+  const skipped =
+    skippedFiles.length === 0
+      ? '- None'
+      : skippedFiles.map((file) => `- \`${file.path}\`: ${file.reason}`).join('\n');
 
   return `# PR Review Report
 
@@ -56,10 +62,13 @@ ${finding.recommendation}`;
 }
 
 function countFindings(findings: ReviewFinding[]): Record<Severity, number> {
-  return findings.reduce<Record<Severity, number>>((counts, finding) => {
-    counts[finding.severity] += 1;
-    return counts;
-  }, { critical: 0, high: 0, medium: 0, low: 0 });
+  return findings.reduce<Record<Severity, number>>(
+    (counts, finding) => {
+      counts[finding.severity] += 1;
+      return counts;
+    },
+    { critical: 0, high: 0, medium: 0, low: 0 },
+  );
 }
 
 function capitalize(value: string): string {

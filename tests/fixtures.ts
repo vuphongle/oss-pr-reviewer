@@ -12,7 +12,8 @@ export const pullRequestFixture: PullRequest = {
       status: 'modified',
       additions: 5,
       deletions: 1,
-      patch: '@@ -10,2 +10,6 @@\n+export function getAccount(id: string) {\n+  return database.get(id);\n+}',
+      patch:
+        '@@ -10,2 +10,6 @@\n+export function getAccount(id: string) {\n+  return database.get(id);\n+}',
     },
     { path: 'assets/logo.png', status: 'modified', additions: 0, deletions: 0 },
     { path: 'src/removed.ts', status: 'deleted', additions: 0, deletions: 4 },

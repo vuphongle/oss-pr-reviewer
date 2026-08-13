@@ -25,6 +25,14 @@ export function createBatches(
       continue;
     }
 
+    if (file.patch.length > limits.maxDiffSize) {
+      skipped.push({
+        path: file.path,
+        reason: `patch exceeds ${limits.maxDiffSize} character batch limit`,
+      });
+      continue;
+    }
+
     const wouldExceedSize = current.characterCount + file.patch.length > limits.maxDiffSize;
     const wouldExceedFiles = current.files.length >= limits.maxFilesPerBatch;
     if (current.files.length > 0 && (wouldExceedSize || wouldExceedFiles)) {

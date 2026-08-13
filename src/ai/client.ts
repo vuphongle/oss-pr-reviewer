@@ -32,9 +32,12 @@ export class OpenAiReviewProvider implements ReviewProvider {
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('AI review response')) throw error;
       const candidate = error as { status?: number; message?: string };
-      if (candidate.status === 401) throw new Error('OpenAI authentication failed. Check OPENAI_API_KEY.');
+      if (candidate.status === 401)
+        throw new Error('OpenAI authentication failed. Check OPENAI_API_KEY.');
       if (candidate.status === 429) throw new Error('OpenAI rate limit reached. Retry later.');
-      throw new Error(`OpenAI review request failed${candidate.message ? `: ${candidate.message}` : '.'}`);
+      throw new Error(
+        `OpenAI review request failed${candidate.message ? `: ${candidate.message}` : '.'}`,
+      );
     }
   }
 }

@@ -27,7 +27,9 @@ export function loadConfig(env: typeof process.env = process.env): AppConfig {
 
 export function requireOpenAiKey(config: AppConfig): string {
   if (!config.openaiApiKey) {
-    throw new Error('OPENAI_API_KEY is required to run an AI review. Set it in the environment or .env.');
+    throw new Error(
+      'OPENAI_API_KEY is required to run an AI review. Set it in the environment or .env.',
+    );
   }
 
   return config.openaiApiKey;

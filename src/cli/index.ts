@@ -10,7 +10,9 @@ const severities: Severity[] = ['low', 'medium', 'high', 'critical'];
 
 const program = new Command()
   .name('oss-pr-reviewer')
-  .description('AI-powered CLI for reviewing GitHub pull requests with structured Markdown reports.')
+  .description(
+    'AI-powered CLI for reviewing GitHub pull requests with structured Markdown reports.',
+  )
   .version('0.1.0');
 
 program
@@ -21,14 +23,32 @@ program
   .option('--url <url>', 'GitHub pull request URL')
   .option('--output <path>', 'write Markdown report to a file instead of only stdout')
   .option('--model <model-name>', 'OpenAI model name', 'gpt-4o-mini')
-  .option('--min-severity <severity>', 'minimum finding severity (low, medium, high, critical)', 'low')
-  .action(async (options: { repo?: string; pr?: string; url?: string; output?: string; model?: string; minSeverity: string }) => {
-    if (!severities.includes(options.minSeverity as Severity)) {
-      throw new Error(`Unsupported severity '${options.minSeverity}'. Choose low, medium, high, or critical.`);
-    }
-    const report = await executeReview({ ...options, minSeverity: options.minSeverity as Severity });
-    if (!options.output) process.stdout.write(report);
-  });
+  .option(
+    '--min-severity <severity>',
+    'minimum finding severity (low, medium, high, critical)',
+    'low',
+  )
+  .action(
+    async (options: {
+      repo?: string;
+      pr?: string;
+      url?: string;
+      output?: string;
+      model?: string;
+      minSeverity: string;
+    }) => {
+      if (!severities.includes(options.minSeverity as Severity)) {
+        throw new Error(
+          `Unsupported severity '${options.minSeverity}'. Choose low, medium, high, or critical.`,
+        );
+      }
+      const report = await executeReview({
+        ...options,
+        minSeverity: options.minSeverity as Severity,
+      });
+      if (!options.output) process.stdout.write(report);
+    },
+  );
 
 try {
   await program.parseAsync();
