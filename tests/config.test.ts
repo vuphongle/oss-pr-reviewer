@@ -5,9 +5,15 @@ import { resolveMinimumSeverity } from '../src/cli/commands/review.js';
 
 describe('repository configuration', () => {
   it('parses a versioned minimum severity configuration', () => {
-    expect(parseRepositoryConfig('version: 1\nreview:\n  minSeverity: medium\n')).toEqual({
+    expect(
+      parseRepositoryConfig(
+        'version: 1\nreview:\n  minSeverity: medium\nrules:\n  - id: require-tests\n    description: Changes need tests.\nignore:\n  paths:\n    - docs/**\n',
+      ),
+    ).toEqual({
       version: 1,
       review: { minSeverity: 'medium' },
+      rules: [{ id: 'require-tests', description: 'Changes need tests.' }],
+      ignore: { paths: ['docs/**'] },
     });
   });
 
@@ -22,11 +28,18 @@ describe('repository configuration', () => {
     expect(() => parseRepositoryConfig('version: 1\nunsupported: true')).toThrow(/unsupported/);
   });
 
+  it('rejects malformed custom rules and ignore paths', () => {
+    expect(() =>
+      parseRepositoryConfig('version: 1\nrules:\n  - id: bad id\n    description: ok'),
+    ).toThrow(/rules/);
+    expect(() => parseRepositoryConfig('version: 1\nignore:\n  paths: [123]')).toThrow(/paths/);
+  });
+
   it('uses defaults when the trusted base branch has no config file', async () => {
     const reader = { getFileAtRef: vi.fn().mockResolvedValue(undefined) };
     await expect(
       loadRepositoryConfig(reader, { owner: 'octo', repository: 'project', ref: 'base-sha' }),
-    ).resolves.toEqual({ version: 1, review: {} });
+    ).resolves.toEqual({ version: 1, review: {}, rules: [], ignore: { paths: [] } });
     expect(reader.getFileAtRef).toHaveBeenCalledWith(
       { owner: 'octo', repository: 'project' },
       '.oss-pr-reviewer.yml',
@@ -40,7 +53,12 @@ describe('repository configuration', () => {
     };
     await expect(
       loadRepositoryConfig(reader, { owner: 'octo', repository: 'project', ref: 'base-sha' }),
-    ).resolves.toEqual({ version: 1, review: { minSeverity: 'high' } });
+    ).resolves.toEqual({
+      version: 1,
+      review: { minSeverity: 'high' },
+      rules: [],
+      ignore: { paths: [] },
+    });
   });
 
   it('does not silently accept invalid trusted configuration', async () => {

@@ -15,7 +15,11 @@ export class OpenAiReviewProvider implements ReviewProvider {
     this.model = model;
   }
 
-  async review(input: { pullRequest: PullRequest; batch: ReviewBatch }): Promise<ReviewResult> {
+  async review(input: {
+    pullRequest: PullRequest;
+    batch: ReviewBatch;
+    reviewRules?: import('../config/repository.js').ReviewRule[];
+  }): Promise<ReviewResult> {
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -23,7 +27,10 @@ export class OpenAiReviewProvider implements ReviewProvider {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: REVIEW_SYSTEM_PROMPT },
-          { role: 'user', content: buildReviewPrompt(input.pullRequest, input.batch) },
+          {
+            role: 'user',
+            content: buildReviewPrompt(input.pullRequest, input.batch, input.reviewRules),
+          },
         ],
       });
       const content = response.choices[0]?.message.content;

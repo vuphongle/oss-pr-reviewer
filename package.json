@@ -45,11 +45,13 @@
     "commander": "^14.0.0",
     "dotenv": "^17.0.0",
     "openai": "^5.0.0",
+    "picomatch": "^4.0.5",
     "yaml": "^2.9.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/picomatch": "^4.0.3",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
