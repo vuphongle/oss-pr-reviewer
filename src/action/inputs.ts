@@ -9,6 +9,7 @@ export interface ActionInputs {
   openAiApiKey: string;
   model?: string;
   minSeverity?: Severity;
+  postComment: boolean;
 }
 
 export interface ActionEnvironment {
@@ -16,6 +17,7 @@ export interface ActionEnvironment {
   OPENAI_API_KEY?: string;
   ACTION_MODEL?: string;
   ACTION_MIN_SEVERITY?: string;
+  ACTION_POST_COMMENT?: string;
 }
 
 export function parseActionInputs(environment: ActionEnvironment): ActionInputs {
@@ -31,12 +33,17 @@ export function parseActionInputs(environment: ActionEnvironment): ActionInputs 
       `Unsupported Action severity '${rawSeverity}'. Choose low, medium, high, or critical.`,
     );
   }
+  const rawPostComment = environment.ACTION_POST_COMMENT?.trim() || 'false';
+  if (rawPostComment !== 'true' && rawPostComment !== 'false') {
+    throw new Error("Invalid post-comment value. Use 'true' or 'false'.");
+  }
 
   return {
     githubToken,
     openAiApiKey,
     model,
     minSeverity: rawSeverity as Severity | undefined,
+    postComment: rawPostComment === 'true',
   };
 }
 

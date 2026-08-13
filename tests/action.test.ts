@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildActionReviewOptions,
@@ -7,7 +7,10 @@ import {
 } from '../src/action/inputs.js';
 import { parsePullRequestEvent } from '../src/action/event.js';
 import { writeActionReport } from '../src/action/output.js';
+import { writeActionOutput } from '../src/action/output.js';
 import { assertActionCredentialsAvailable } from '../src/action/security.js';
+import { publishActionComment } from '../src/action/comment.js';
+import { OSS_PR_REVIEWER_MARKER } from '../src/github/comments.js';
 import { readFile as readTextFile } from 'node:fs/promises';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,12 +25,14 @@ describe('GitHub Action inputs', () => {
         OPENAI_API_KEY: 'openai-key',
         ACTION_MODEL: 'gpt-test',
         ACTION_MIN_SEVERITY: 'high',
+        ACTION_POST_COMMENT: 'true',
       }),
     ).toEqual({
       githubToken: 'github-token',
       openAiApiKey: 'openai-key',
       model: 'gpt-test',
       minSeverity: 'high',
+      postComment: true,
     });
   });
 
@@ -40,6 +45,26 @@ describe('GitHub Action inputs', () => {
         ACTION_MIN_SEVERITY: 'urgent',
       }),
     ).toThrow(/severity/);
+    expect(() =>
+      parseActionInputs({
+        GITHUB_TOKEN: 'github-token',
+        OPENAI_API_KEY: 'openai-key',
+        ACTION_POST_COMMENT: 'sometimes',
+      }),
+    ).toThrow(/post-comment/);
+  });
+
+  it('defaults comment publishing to disabled and accepts false explicitly', () => {
+    expect(
+      parseActionInputs({ GITHUB_TOKEN: 'github-token', OPENAI_API_KEY: 'openai-key' }).postComment,
+    ).toBe(false);
+    expect(
+      parseActionInputs({
+        GITHUB_TOKEN: 'github-token',
+        OPENAI_API_KEY: 'openai-key',
+        ACTION_POST_COMMENT: 'false',
+      }).postComment,
+    ).toBe(false);
   });
 
   it('maps action inputs to the existing review command contract', () => {
@@ -146,6 +171,15 @@ describe('GitHub Action security documentation', () => {
     expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.3\.0/);
     expect(workflow).not.toMatch(/pull_request_target/);
   });
+
+  it('declares opt-in comment mode and stable outputs in action.yml', async () => {
+    const action = await readTextFile(new URL('../action.yml', import.meta.url), 'utf8');
+    expect(action).toMatch(/post-comment:/);
+    expect(action).toMatch(/default: 'false'/);
+    expect(action).toMatch(/comment-action:/);
+    expect(action).toMatch(/comment-id:/);
+    expect(action).toMatch(/comment-url:/);
+  });
 });
 
 describe('GitHub Action report output', () => {
@@ -158,5 +192,49 @@ describe('GitHub Action report output', () => {
 
     await expect(readFile(reportPath, 'utf8')).resolves.toBe('# Report\n');
     await expect(readFile(summaryPath, 'utf8')).resolves.toBe('# Report\n');
+  });
+
+  it('writes stable action outputs using the GitHub output protocol', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'oss-pr-reviewer-action-output-'));
+    const outputPath = join(directory, 'output');
+
+    await writeActionOutput(outputPath, { 'comment-action': 'created', 'comment-id': '22' });
+
+    const output = await readFile(outputPath, 'utf8');
+    expect(output).toMatch(/comment-action<<.*\ncreated\n/);
+    expect(output).toMatch(/comment-id<<.*\n22\n/);
+  });
+
+  it('does not call GitHub comments when comment mode is disabled', async () => {
+    const client = { listComments: vi.fn() };
+    await expect(
+      publishActionComment(
+        client as never,
+        { url: 'https://github.com/octo/project/pull/7', number: 7, isFork: false },
+        '## Review',
+        false,
+      ),
+    ).resolves.toBeUndefined();
+    expect(client.listComments).not.toHaveBeenCalled();
+  });
+
+  it('publishes the existing report when comment mode is enabled', async () => {
+    const client = {
+      listComments: vi.fn().mockResolvedValue([]),
+      createComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
+    };
+    await expect(
+      publishActionComment(
+        client as never,
+        { url: 'https://github.com/octo/project/pull/7', number: 7, isFork: false },
+        '## Review',
+        true,
+      ),
+    ).resolves.toEqual({ action: 'created', id: 22, htmlUrl: 'https://example.test/c/22' });
+    expect(client.createComment).toHaveBeenCalledWith(
+      { owner: 'octo', repository: 'project' },
+      7,
+      `${OSS_PR_REVIEWER_MARKER}\n\n## Review`,
+    );
   });
 });
