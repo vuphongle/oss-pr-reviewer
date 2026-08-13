@@ -134,6 +134,18 @@ describe('GitHub Action security documentation', () => {
     expect(security).toMatch(/pull_request_target/);
     expect(security).toMatch(/GITHUB_STEP_SUMMARY/);
   });
+
+  it('keeps the documented workflow on pull_request with read-only permissions', async () => {
+    const workflow = await readTextFile(
+      new URL('../examples/github-actions/basic.yml', import.meta.url),
+      'utf8',
+    );
+    expect(workflow).toMatch(/pull_request:/);
+    expect(workflow).toMatch(/contents: read/);
+    expect(workflow).toMatch(/pull-requests: read/);
+    expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.3\.0/);
+    expect(workflow).not.toMatch(/pull_request_target/);
+  });
 });
 
 describe('GitHub Action report output', () => {

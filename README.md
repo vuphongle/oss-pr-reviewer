@@ -21,10 +21,11 @@ Pull request review often starts with the same context-gathering work: finding t
 - Validate OpenAI JSON responses with Zod.
 - Deduplicate identical findings and apply deterministic severity filtering.
 - Print Markdown to stdout or write it to `--output`.
-- Run lint, typecheck, tests, and build in GitHub Actions without secrets.
+- Run lint, typecheck, tests, and build in GitHub Actions without live review secrets.
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
 - Reserve predictable prompt/response space with simple character-based context budget settings.
+- Run an opt-in GitHub Action that appends advisory reports to the Actions job summary.
 
 ## How It Works
 
@@ -103,6 +104,33 @@ ignore:
 
 The file is loaded from the pull request's base commit, not the PR branch, so a PR cannot silently change the policy used to review itself. CLI options override repository configuration, and configuration overrides application defaults. Rule text is treated as untrusted review guidance. Ignored files are excluded before AI review and shown in the report's skipped-file information. See [docs/configuration.md](docs/configuration.md) and [examples/oss-pr-reviewer.yml](examples/oss-pr-reviewer.yml).
 
+## GitHub Actions
+
+v0.3.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and appends the Markdown report to the job summary. It does not post comments or execute the reviewed PR.
+
+```yaml
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: vuphongle/oss-pr-reviewer@v0.3.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+Live Action reviews require `OPENAI_API_KEY`; tests and local development do not. Fork pull requests normally cannot access repository secrets under `pull_request`, so do not switch to `pull_request_target` casually. See [docs/github-actions.md](docs/github-actions.md) for permissions, inputs, security boundaries, and limitations.
+
 ## CLI Usage
 
 ```bash
@@ -159,7 +187,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
 - GitHub-truncated, missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
-- It does not post comments, create annotations, clone repositories, run tests, or replace human/security review.
+- The GitHub Action does not post comments or create annotations; it writes a job summary only. The CLI does not clone repositories or run tests.
 - Live API usage requires network access and valid credentials; automated tests use mocks.
 
 ## Development and Testing
@@ -176,9 +204,9 @@ Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same
 
 ## Roadmap
 
-These are possible future directions, not v0.2.0 features:
+These are possible future directions, not current features:
 
-- **v0.3:** a GitHub Action, automatic PR comments, inline annotations, and richer maintainer integrations.
+- **v0.4:** optional PR comments or annotations, subject to a separate permission and duplicate-output design.
 
 ## License
 
