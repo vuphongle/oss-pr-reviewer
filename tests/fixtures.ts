@@ -6,6 +6,7 @@ export const pullRequestFixture: PullRequest = {
   number: 12,
   title: 'Validate account access',
   body: 'Adds an authorization check.',
+  baseSha: 'base-sha',
   files: [
     {
       path: 'src/api/account.ts',

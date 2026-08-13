@@ -23,11 +23,7 @@ program
   .option('--url <url>', 'GitHub pull request URL')
   .option('--output <path>', 'write Markdown report to a file instead of only stdout')
   .option('--model <model-name>', 'OpenAI model name', 'gpt-4o-mini')
-  .option(
-    '--min-severity <severity>',
-    'minimum finding severity (low, medium, high, critical)',
-    'low',
-  )
+  .option('--min-severity <severity>', 'minimum finding severity (low, medium, high, critical)')
   .action(
     async (options: {
       repo?: string;
@@ -35,16 +31,16 @@ program
       url?: string;
       output?: string;
       model?: string;
-      minSeverity: string;
+      minSeverity?: string;
     }) => {
-      if (!severities.includes(options.minSeverity as Severity)) {
+      if (options.minSeverity && !severities.includes(options.minSeverity as Severity)) {
         throw new Error(
           `Unsupported severity '${options.minSeverity}'. Choose low, medium, high, or critical.`,
         );
       }
       const report = await executeReview({
         ...options,
-        minSeverity: options.minSeverity as Severity,
+        minSeverity: options.minSeverity as Severity | undefined,
       });
       if (!options.output) process.stdout.write(report);
     },

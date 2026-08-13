@@ -1,14 +1,16 @@
 import { Octokit } from '@octokit/rest';
+import { Buffer } from 'node:buffer';
 
 import type { PullRequest } from '../types.js';
 import type { RepositoryReference } from './types.js';
+import type { RepositoryFileReader } from '../config/repository.js';
 
 interface GithubClientOptions {
   token?: string;
   octokit?: Octokit;
 }
 
-export class GithubClient {
+export class GithubClient implements RepositoryFileReader {
   private readonly octokit: Octokit;
 
   constructor(options: GithubClientOptions = {}) {
@@ -38,6 +40,7 @@ export class GithubClient {
         number,
         title: pullResponse.data.title,
         body: pullResponse.data.body ?? '',
+        baseSha: pullResponse.data.base.sha,
         files: filesResponse.map((file) => ({
           path: file.filename,
           status: file.status,
@@ -48,6 +51,27 @@ export class GithubClient {
         })),
       };
     } catch (error) {
+      throw normalizeGithubError(error);
+    }
+  }
+
+  async getFileAtRef(
+    reference: RepositoryReference,
+    path: string,
+    ref: string,
+  ): Promise<string | undefined> {
+    try {
+      const response = await this.octokit.repos.getContent({
+        owner: reference.owner,
+        repo: reference.repository,
+        path,
+        ref,
+      });
+      if (!('content' in response.data) || response.data.type !== 'file') return undefined;
+      return Buffer.from(response.data.content, 'base64').toString('utf8');
+    } catch (error) {
+      const candidate = error as { status?: number };
+      if (candidate.status === 404) return undefined;
       throw normalizeGithubError(error);
     }
   }
