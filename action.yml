@@ -1,0 +1,33 @@
+name: oss-pr-reviewer
+description: Run an advisory AI review for a pull_request and append the Markdown report to the job summary.
+author: oss-pr-reviewer maintainers
+inputs:
+  github-token:
+    description: GitHub token used to read pull request metadata and patches.
+    required: true
+  openai-api-key:
+    description: OpenAI API key used for the review request.
+    required: true
+  model:
+    description: OpenAI model name.
+    required: false
+    default: gpt-4o-mini
+  min-severity:
+    description: Minimum finding severity to include in the report.
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Build and run oss-pr-reviewer
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        ACTION_MODEL: ${{ inputs.model }}
+        ACTION_MIN_SEVERITY: ${{ inputs.min-severity }}
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts --prefix "$ACTION_PATH"
+        npm run build --prefix "$ACTION_PATH"
+        node "$ACTION_PATH/dist/action/main.js"
