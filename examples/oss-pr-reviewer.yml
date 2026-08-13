@@ -14,3 +14,6 @@ ignore:
     - docs/**
     - dist/**
     - '**/*.generated.ts'
+
+context:
+  maxFilesPerBatch: 10

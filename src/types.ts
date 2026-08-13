@@ -70,4 +70,7 @@ export interface ReviewReportData {
   result: ReviewResult;
   skippedFiles: SkippedFile[];
   reviewedFileCount: number;
+  changedFileCount: number;
+  ignoredFileCount: number;
+  batchCount: number;
 }
