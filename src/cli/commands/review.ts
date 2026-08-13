@@ -35,6 +35,7 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
     pullRequest,
     provider,
     resolveMinimumSeverity(options.minSeverity, repositoryConfig),
+    repositoryConfig,
   );
   const report = renderMarkdown({ pullRequest, ...execution });
 

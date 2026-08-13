@@ -23,6 +23,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Print Markdown to stdout or write it to `--output`.
 - Run lint, typecheck, tests, and build in GitHub Actions without secrets.
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
+- Add repository-specific review rules and ignore paths without changing application code.
 
 ## How It Works
 
@@ -88,9 +89,18 @@ version: 1
 
 review:
   minSeverity: medium
+
+rules:
+  - id: require-tests
+    description: Changes under src/ should normally include corresponding tests.
+
+ignore:
+  paths:
+    - docs/**
+    - '**/*.generated.ts'
 ```
 
-The file is loaded from the pull request's base commit, not the PR branch, so a PR cannot silently change the policy used to review itself. CLI options override repository configuration, and configuration overrides application defaults. See [docs/configuration.md](docs/configuration.md) and [examples/oss-pr-reviewer.yml](examples/oss-pr-reviewer.yml).
+The file is loaded from the pull request's base commit, not the PR branch, so a PR cannot silently change the policy used to review itself. CLI options override repository configuration, and configuration overrides application defaults. Rule text is treated as untrusted review guidance. Ignored files are excluded before AI review and shown in the report's skipped-file information. See [docs/configuration.md](docs/configuration.md) and [examples/oss-pr-reviewer.yml](examples/oss-pr-reviewer.yml).
 
 ## CLI Usage
 

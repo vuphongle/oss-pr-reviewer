@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createBatches, REVIEW_LIMITS } from '../src/review/batching.js';
 import { normalizeFiles } from '../src/review/normalize.js';
@@ -6,6 +6,7 @@ import { reviewPullRequest } from '../src/review/reviewer.js';
 import { deduplicateFindings, filterFindings, severityOrder } from '../src/review/severity.js';
 import { findingFixture, pullRequestFixture, resultFixture } from './fixtures.js';
 import type { ReviewProvider } from '../src/ai/provider.js';
+import { DEFAULT_REPOSITORY_CONFIG } from '../src/config/repository.js';
 
 describe('severity and findings', () => {
   it('orders severities deterministically', () =>
@@ -94,5 +95,41 @@ describe('review pipeline', () => {
     expect(execution.result.findings).toEqual([]);
     expect(execution.result.summary).toContain('No reviewable');
     expect(execution.reviewedFileCount).toBe(0);
+  });
+
+  it('passes repository rules to the provider and reports ignored files', async () => {
+    const review = vi.fn().mockResolvedValue(resultFixture({ findings: [] }));
+    const provider: ReviewProvider = { review };
+    const execution = await reviewPullRequest(
+      {
+        ...pullRequestFixture,
+        files: [
+          ...pullRequestFixture.files,
+          {
+            path: 'src/payment.ts',
+            status: 'modified',
+            additions: 1,
+            deletions: 0,
+            patch: '+return true;',
+          },
+        ],
+      },
+      provider,
+      'low',
+      {
+        ...DEFAULT_REPOSITORY_CONFIG,
+        rules: [{ id: 'require-tests', description: 'Changes to source need tests.' }],
+        ignore: { paths: ['src/api/**'] },
+      },
+    );
+    expect(execution.skippedFiles).toContainEqual({
+      path: 'src/api/account.ts',
+      reason: 'ignored by repository configuration',
+    });
+    expect(review).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewRules: [{ id: 'require-tests', description: 'Changes to source need tests.' }],
+      }),
+    );
   });
 });

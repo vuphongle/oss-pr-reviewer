@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { parse as parseYaml } from 'yaml';
+import picomatch from 'picomatch';
 
 import type { Severity } from '../types.js';
 import type { RepositoryReference } from '../github/types.js';
@@ -12,10 +13,29 @@ const repositoryConfigSchema = z
         minSeverity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
       })
       .default({}),
+    rules: z
+      .array(
+        z.object({
+          id: z
+            .string()
+            .trim()
+            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+          description: z.string().trim().min(1),
+        }),
+      )
+      .default([]),
+    ignore: z
+      .object({
+        paths: z
+          .array(z.string().trim().min(1).refine(isValidGlob, 'must be a valid glob pattern'))
+          .default([]),
+      })
+      .default({}),
   })
   .strict();
 
 export type RepositoryConfig = z.infer<typeof repositoryConfigSchema>;
+export type ReviewRule = RepositoryConfig['rules'][number];
 
 export interface RepositoryFileReader {
   getFileAtRef(
@@ -31,7 +51,12 @@ export interface TrustedConfigReference {
   ref: string;
 }
 
-export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = { version: 1, review: {} };
+export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = {
+  version: 1,
+  review: {},
+  rules: [],
+  ignore: { paths: [] },
+};
 
 export function parseRepositoryConfig(content: string): RepositoryConfig {
   let value: unknown;
@@ -74,4 +99,13 @@ export async function loadRepositoryConfig(
 
 export function getConfiguredMinimumSeverity(config: RepositoryConfig): Severity {
   return config.review.minSeverity ?? 'low';
+}
+
+function isValidGlob(pattern: string): boolean {
+  try {
+    picomatch.makeRe(pattern);
+    return true;
+  } catch {
+    return false;
+  }
 }

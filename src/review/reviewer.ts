@@ -1,5 +1,8 @@
 import type { PullRequest, ReviewResult, Severity, SkippedFile } from '../types.js';
+import type { RepositoryConfig } from '../config/repository.js';
+import { DEFAULT_REPOSITORY_CONFIG } from '../config/repository.js';
 import { createBatches } from './batching.js';
+import { filterIgnoredFiles } from './ignore.js';
 import { normalizeFiles } from './normalize.js';
 import { deduplicateFindings, filterFindings, severityOrder } from './severity.js';
 import type { ReviewProvider } from '../ai/provider.js';
@@ -14,10 +17,12 @@ export async function reviewPullRequest(
   pullRequest: PullRequest,
   provider: ReviewProvider,
   minimumSeverity: Severity = 'low',
+  repositoryConfig: RepositoryConfig = DEFAULT_REPOSITORY_CONFIG,
 ): Promise<ReviewExecution> {
-  const normalized = normalizeFiles(pullRequest.files);
+  const ignored = filterIgnoredFiles(pullRequest.files, repositoryConfig.ignore.paths);
+  const normalized = normalizeFiles(ignored.files);
   const batched = createBatches(normalized.reviewable);
-  const skippedFiles = [...normalized.skipped, ...batched.skipped];
+  const skippedFiles = [...ignored.skipped, ...normalized.skipped, ...batched.skipped];
 
   if (batched.batches.length === 0) {
     return {
@@ -32,7 +37,9 @@ export async function reviewPullRequest(
   }
 
   const results = await Promise.all(
-    batched.batches.map((batch) => provider.review({ pullRequest, batch })),
+    batched.batches.map((batch) =>
+      provider.review({ pullRequest, batch, reviewRules: repositoryConfig.rules }),
+    ),
   );
   const findings = filterFindings(
     deduplicateFindings(results.flatMap((result) => result.findings)),

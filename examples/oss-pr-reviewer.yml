@@ -2,3 +2,15 @@ version: 1
 
 review:
   minSeverity: medium
+
+rules:
+  - id: require-tests
+    description: Changes under src/ should normally include corresponding tests.
+  - id: protect-auth-boundary
+    description: Pay particular attention to authorization changes under src/auth/.
+
+ignore:
+  paths:
+    - docs/**
+    - dist/**
+    - '**/*.generated.ts'
