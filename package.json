@@ -1,6 +1,6 @@
 {
   "name": "oss-pr-reviewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI-powered CLI for reviewing GitHub pull requests, detecting potential bugs, security risks, regressions, and missing tests, with structured Markdown reports for open-source maintainers.",
   "type": "module",
   "bin": {

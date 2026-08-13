@@ -11,7 +11,7 @@ describe('CLI input parsing', () => {
     const packageJson = JSON.parse(
       await readFile(new URL('../package.json', import.meta.url), 'utf8'),
     ) as { version: string };
-    expect(packageJson.version).toBe('0.3.0');
+    expect(packageJson.version).toBe('0.4.0');
   });
   it('parses owner/repository', () =>
     expect(parseRepository('octo/project')).toEqual({ owner: 'octo', repository: 'project' }));

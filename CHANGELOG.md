@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Added opt-in GitHub Action PR comment output through `post-comment: true`; summary output remains the default.
+- Added stable marker-based comment ownership with create-once and update-in-place behavior for repeated reviews.
+- Added `comment-action`, `comment-id`, and `comment-url` Action outputs.
+- Added least-privilege documentation for summary-only (`pull-requests: read`) and comment mode (`pull-requests: write`).
+- Added deterministic comment-size limiting, priority-aware truncation, mention neutralization, fork guidance, and troubleshooting docs.
+
+Comment mode does not use `pull_request_target`, execute reviewed code, delete old comments, or fail because findings are high or critical. Live GitHub/OpenAI PR comment smoke testing remains pending; validation uses deterministic mocks, synthetic events, static Action checks, and CI.
+
 ## 0.3.0
 
 - Added an opt-in composite GitHub Action for `pull_request` events with `opened`, `synchronize`, and `reopened` actions.

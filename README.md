@@ -47,7 +47,7 @@ npm install
 npm run build
 ```
 
-The v0.3.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
+The v0.4.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
 
 ```bash
 npm link
