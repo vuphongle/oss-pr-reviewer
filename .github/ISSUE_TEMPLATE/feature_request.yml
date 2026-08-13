@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a focused improvement to oss-pr-reviewer.
+title: 'feat: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What maintainer problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Proposed use case
+      description: Describe who would use it and when.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected behavior
+      description: Describe the smallest useful behavior or interface.
+    validations:
+      required: true
