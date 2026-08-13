@@ -1,0 +1,59 @@
+{
+  "name": "oss-pr-reviewer",
+  "version": "0.1.0",
+  "description": "AI-powered CLI for reviewing GitHub pull requests, detecting potential bugs, security risks, regressions, and missing tests, with structured Markdown reports for open-source maintainers.",
+  "type": "module",
+  "bin": {
+    "oss-pr-reviewer": "dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "keywords": [
+    "ai",
+    "code-review",
+    "pull-request",
+    "github",
+    "cli",
+    "open-source",
+    "developer-tools",
+    "typescript",
+    "llm",
+    "maintainer-tools"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vuphongle/oss-pr-reviewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vuphongle/oss-pr-reviewer/issues"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.0",
+    "commander": "^14.0.0",
+    "dotenv": "^17.0.0",
+    "openai": "^5.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

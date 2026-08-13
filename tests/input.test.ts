@@ -1,0 +1,14 @@
+import { describe, expect, it } from 'vitest';
+
+import { parsePullRequestUrl, parseRepository } from '../src/github/types.js';
+import { executeReview } from '../src/cli/commands/review.js';
+
+describe('CLI input parsing', () => {
+  it('parses owner/repository', () => expect(parseRepository('octo/project')).toEqual({ owner: 'octo', repository: 'project' }));
+  it('rejects malformed repositories', () => expect(() => parseRepository('octo/project/extra')).toThrow(/Expected/));
+  it('parses a GitHub pull request URL', () => expect(parsePullRequestUrl('https://github.com/octo/project/pull/123')).toEqual({ repository: { owner: 'octo', repository: 'project' }, number: 123 }));
+  it('rejects malformed URLs', () => expect(() => parsePullRequestUrl('https://gitlab.com/octo/project/pull/123')).toThrow(/github.com/));
+  it('rejects conflicting CLI inputs before network work', async () => {
+    await expect(executeReview({ repo: 'octo/project', pr: '1', url: 'https://github.com/octo/project/pull/1', minSeverity: 'low' })).rejects.toThrow(/either/);
+  });
+});
