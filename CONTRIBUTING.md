@@ -34,4 +34,6 @@ npm run format:check
 
 Add deterministic unit coverage for new behavior. Do not make tests call GitHub or OpenAI. Update README and the relevant `docs/` page when public behavior changes.
 
+When changing repository configuration, preserve the trusted-base-commit boundary and add tests for invalid input and CLI precedence.
+
 Pull requests should explain the behavior change, test evidence, security implications, and known limitations. Keep changes small and reviewable.

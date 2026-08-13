@@ -9,3 +9,4 @@ export * from './review/severity.js';
 export * from './report/markdown.js';
 export * from './ai/provider.js';
 export * from './ai/client.js';
+export * from './config/repository.js';

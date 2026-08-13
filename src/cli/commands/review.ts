@@ -7,6 +7,8 @@ import { parsePullRequestUrl, parseRepository } from '../../github/types.js';
 import { renderMarkdown } from '../../report/markdown.js';
 import { reviewPullRequest } from '../../review/reviewer.js';
 import type { Severity } from '../../types.js';
+import type { RepositoryConfig } from '../../config/repository.js';
+import { getConfiguredMinimumSeverity, loadRepositoryConfig } from '../../config/repository.js';
 
 export interface ReviewCommandOptions {
   repo?: string;
@@ -14,7 +16,7 @@ export interface ReviewCommandOptions {
   url?: string;
   output?: string;
   model?: string;
-  minSeverity: Severity;
+  minSeverity?: Severity;
 }
 
 export async function executeReview(options: ReviewCommandOptions): Promise<string> {
@@ -23,8 +25,17 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
   const openAiApiKey = requireOpenAiKey(config);
   const github = new GithubClient({ token: config.githubToken });
   const pullRequest = await github.getPullRequest(input.repository, input.number);
+  const repositoryConfig = await loadRepositoryConfig(github, {
+    owner: pullRequest.owner,
+    repository: pullRequest.repository,
+    ref: pullRequest.baseSha,
+  });
   const provider = new OpenAiReviewProvider(openAiApiKey, options.model);
-  const execution = await reviewPullRequest(pullRequest, provider, options.minSeverity);
+  const execution = await reviewPullRequest(
+    pullRequest,
+    provider,
+    resolveMinimumSeverity(options.minSeverity, repositoryConfig),
+  );
   const report = renderMarkdown({ pullRequest, ...execution });
 
   if (options.output) {
@@ -38,6 +49,13 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
   }
 
   return report;
+}
+
+export function resolveMinimumSeverity(
+  cliValue: Severity | undefined,
+  repositoryConfig: RepositoryConfig,
+): Severity {
+  return cliValue ?? getConfiguredMinimumSeverity(repositoryConfig);
 }
 
 function resolveInput(options: ReviewCommandOptions): {

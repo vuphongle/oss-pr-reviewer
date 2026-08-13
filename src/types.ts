@@ -17,6 +17,7 @@ export interface PullRequest {
   number: number;
   title: string;
   body: string;
+  baseSha: string;
   files: ChangedFile[];
 }
 

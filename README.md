@@ -22,6 +22,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Deduplicate identical findings and apply deterministic severity filtering.
 - Print Markdown to stdout or write it to `--output`.
 - Run lint, typecheck, tests, and build in GitHub Actions without secrets.
+- Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 
 ## How It Works
 
@@ -77,6 +78,19 @@ OPENAI_API_KEY=
 ```
 
 `OPENAI_API_KEY` is required for an AI review. Never commit `.env` or place real credentials in examples, issues, reports, or logs.
+
+### Repository configuration
+
+v0.2 supports an optional `.oss-pr-reviewer.yml` file:
+
+```yaml
+version: 1
+
+review:
+  minSeverity: medium
+```
+
+The file is loaded from the pull request's base commit, not the PR branch, so a PR cannot silently change the policy used to review itself. CLI options override repository configuration, and configuration overrides application defaults. See [docs/configuration.md](docs/configuration.md) and [examples/oss-pr-reviewer.yml](examples/oss-pr-reviewer.yml).
 
 ## CLI Usage
 
