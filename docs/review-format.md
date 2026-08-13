@@ -1,6 +1,6 @@
 # Review Format
 
-The CLI emits Markdown with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. v0.2.0 statistics also include files changed, files ignored by configuration, and review batches.
+The CLI emits Markdown with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. v0.3.0 keeps the v0.2.0 statistics, including files changed, files ignored by configuration, and review batches. The GitHub Action places the same report in the Actions job summary.
 
 ## Severity
 

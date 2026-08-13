@@ -47,7 +47,7 @@ npm install
 npm run build
 ```
 
-The v0.2.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
+The v0.3.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
 
 ```bash
 npm link
@@ -171,7 +171,7 @@ The full report also includes pull request metadata, summary, statistics, skippe
 
 ## Architecture
 
-The CLI depends on a small `ReviewProvider` interface, so the review engine does not contain OpenAI SDK details. v0.2.0 ships one provider: OpenAI. Review content, repository rules, and ignored-path configuration are treated as untrusted repository data; changed code is never executed. See [docs/architecture.md](docs/architecture.md).
+The CLI depends on a small `ReviewProvider` interface, so the review engine does not contain OpenAI SDK details. v0.3.0 ships one provider: OpenAI. Review content, repository rules, and ignored-path configuration are treated as untrusted repository data; changed code is never executed. See [docs/architecture.md](docs/architecture.md).
 
 ## Review Philosophy
 
@@ -183,7 +183,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 
 ## Limitations
 
-- Only OpenAI is implemented in v0.2.0.
+- Only OpenAI is implemented in v0.3.0.
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
 - GitHub-truncated, missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
