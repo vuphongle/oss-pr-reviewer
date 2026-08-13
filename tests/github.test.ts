@@ -89,4 +89,61 @@ describe('GitHub client', () => {
       ),
     ).resolves.toBeUndefined();
   });
+
+  it('normalizes PR comment list, create, and update API calls', async () => {
+    const octokit = {
+      issues: {
+        listComments: vi.fn(),
+        createComment: vi.fn().mockResolvedValue({
+          data: { id: 22, html_url: 'https://github.test/comments/22' },
+        }),
+        updateComment: vi.fn().mockResolvedValue({
+          data: { id: 22, html_url: 'https://github.test/comments/22' },
+        }),
+      },
+      paginate: vi.fn().mockResolvedValue([
+        {
+          id: 22,
+          body: '<!-- oss-pr-reviewer -->\nreport',
+          html_url: 'https://github.test/comments/22',
+          user: { type: 'Bot', login: 'github-actions[bot]' },
+        },
+      ]),
+    };
+    const client = new GithubClient({ octokit: octokit as never });
+
+    await expect(client.listComments(reference, 7)).resolves.toMatchObject([
+      {
+        id: 22,
+        body: '<!-- oss-pr-reviewer -->\nreport',
+        user: { type: 'Bot', login: 'github-actions[bot]' },
+      },
+    ]);
+    await expect(client.createComment(reference, 7, 'body')).resolves.toEqual({
+      id: 22,
+      htmlUrl: 'https://github.test/comments/22',
+    });
+    await expect(client.updateComment(reference, 7, 22, 'updated')).resolves.toEqual({
+      id: 22,
+      htmlUrl: 'https://github.test/comments/22',
+    });
+    expect(octokit.paginate).toHaveBeenCalledWith(octokit.issues.listComments, {
+      owner: 'octo',
+      repo: 'project',
+      issue_number: 7,
+      per_page: 100,
+    });
+    expect(octokit.issues.createComment).toHaveBeenCalledWith({
+      owner: 'octo',
+      repo: 'project',
+      issue_number: 7,
+      body: 'body',
+    });
+    expect(octokit.issues.updateComment).toHaveBeenCalledWith({
+      owner: 'octo',
+      repo: 'project',
+      comment_id: 22,
+      body: 'updated',
+    });
+  });
 });
