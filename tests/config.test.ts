@@ -14,6 +14,7 @@ describe('repository configuration', () => {
       review: { minSeverity: 'medium' },
       rules: [{ id: 'require-tests', description: 'Changes need tests.' }],
       ignore: { paths: ['docs/**'] },
+      context: {},
     });
   });
 
@@ -39,7 +40,7 @@ describe('repository configuration', () => {
     const reader = { getFileAtRef: vi.fn().mockResolvedValue(undefined) };
     await expect(
       loadRepositoryConfig(reader, { owner: 'octo', repository: 'project', ref: 'base-sha' }),
-    ).resolves.toEqual({ version: 1, review: {}, rules: [], ignore: { paths: [] } });
+    ).resolves.toEqual({ version: 1, review: {}, rules: [], ignore: { paths: [] }, context: {} });
     expect(reader.getFileAtRef).toHaveBeenCalledWith(
       { owner: 'octo', repository: 'project' },
       '.oss-pr-reviewer.yml',
@@ -58,6 +59,7 @@ describe('repository configuration', () => {
       review: { minSeverity: 'high' },
       rules: [],
       ignore: { paths: [] },
+      context: {},
     });
   });
 
@@ -76,5 +78,12 @@ describe('repository configuration', () => {
       resolveMinimumSeverity(undefined, { version: 1, review: { minSeverity: 'medium' } }),
     ).toBe('medium');
     expect(resolveMinimumSeverity(undefined, { version: 1, review: {} })).toBe('low');
+  });
+
+  it('validates and exposes context budget overrides', () => {
+    const config = parseRepositoryConfig(
+      'version: 1\ncontext:\n  maxFilesPerBatch: 10\n  reservedResponseCharacters: 15000',
+    );
+    expect(config.context).toEqual({ maxFilesPerBatch: 10, reservedResponseCharacters: 15000 });
   });
 });

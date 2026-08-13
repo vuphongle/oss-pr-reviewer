@@ -13,6 +13,8 @@ PR normalization
   |
 Path ignores
   |
+Context budget
+  |
 Deterministic batching
   |
 Review engine
@@ -33,7 +35,8 @@ Markdown renderer
 - `src/config/repository.ts` validates optional `.oss-pr-reviewer.yml` content loaded from the pull request base SHA. PR-head configuration is never used as active policy.
 - `src/review/ignore.ts` applies repository glob exclusions before normalization. Ignored files remain visible in skipped-file reporting.
 - `src/review/normalize.ts` removes binary and patchless files from AI input while preserving skip reasons for the report.
-- `src/review/batching.ts` applies the centralized `maxDiffSize`, `maxFileSize`, and `maxFilesPerBatch` limits.
+- `src/review/batching.ts` applies centralized diff, file, batch, and reserved-context limits through `ReviewBudget`.
+- `src/review/batching.ts` exposes an explicit character-based budget with reserved prompt/response space while retaining the v0.1 legacy batching shape.
 - `src/ai/` contains the OpenAI SDK boundary. The rest of the review engine depends on the small `ReviewProvider` interface.
 - `src/review/schema.ts` validates every provider response before it enters the merge pipeline.
 - `src/report/` renders the final report without making claims that automated review is definitive.

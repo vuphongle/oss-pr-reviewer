@@ -82,6 +82,9 @@ describe('review pipeline', () => {
     expect(execution.result.findings).toHaveLength(1);
     expect(execution.skippedFiles).toHaveLength(2);
     expect(execution.reviewedFileCount).toBe(1);
+    expect(execution.changedFileCount).toBe(3);
+    expect(execution.ignoredFileCount).toBe(0);
+    expect(execution.batchCount).toBe(1);
   });
   it('returns a useful empty result when no patches are reviewable', async () => {
     const provider: ReviewProvider = { review: async () => resultFixture() };
@@ -95,6 +98,8 @@ describe('review pipeline', () => {
     expect(execution.result.findings).toEqual([]);
     expect(execution.result.summary).toContain('No reviewable');
     expect(execution.reviewedFileCount).toBe(0);
+    expect(execution.changedFileCount).toBe(1);
+    expect(execution.batchCount).toBe(0);
   });
 
   it('passes repository rules to the provider and reports ignored files', async () => {

@@ -24,6 +24,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Run lint, typecheck, tests, and build in GitHub Actions without secrets.
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
+- Reserve predictable prompt/response space with simple character-based context budget settings.
 
 ## How It Works
 

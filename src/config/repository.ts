@@ -4,6 +4,7 @@ import picomatch from 'picomatch';
 
 import type { Severity } from '../types.js';
 import type { RepositoryReference } from '../github/types.js';
+import type { ReviewBudget } from '../review/batching.js';
 
 const repositoryConfigSchema = z
   .object({
@@ -31,6 +32,15 @@ const repositoryConfigSchema = z
           .default([]),
       })
       .default({}),
+    context: z
+      .object({
+        maxFilesPerBatch: z.number().int().positive().max(100).optional(),
+        maxDiffCharacters: z.number().int().positive().max(500_000).optional(),
+        maxFileCharacters: z.number().int().positive().max(200_000).optional(),
+        reservedPromptCharacters: z.number().int().nonnegative().max(100_000).optional(),
+        reservedResponseCharacters: z.number().int().nonnegative().max(100_000).optional(),
+      })
+      .default({}),
   })
   .strict();
 
@@ -56,6 +66,7 @@ export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = {
   review: {},
   rules: [],
   ignore: { paths: [] },
+  context: {},
 };
 
 export function parseRepositoryConfig(content: string): RepositoryConfig {
@@ -99,6 +110,13 @@ export async function loadRepositoryConfig(
 
 export function getConfiguredMinimumSeverity(config: RepositoryConfig): Severity {
   return config.review.minSeverity ?? 'low';
+}
+
+export function getConfiguredReviewBudget(
+  config: RepositoryConfig,
+  defaults: ReviewBudget,
+): ReviewBudget {
+  return { ...defaults, ...config.context };
 }
 
 function isValidGlob(pattern: string): boolean {

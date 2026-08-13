@@ -32,7 +32,10 @@ ${findings}
 ## Review Statistics
 
 - Files reviewed: ${data.reviewedFileCount}
+- Files changed: ${data.changedFileCount}
+- Files ignored: ${data.ignoredFileCount}
 - Files skipped: ${skippedFiles.length}
+- Review batches: ${data.batchCount}
 - Findings: ${result.findings.length}
 - Critical: ${counts.critical}
 - High: ${counts.high}
