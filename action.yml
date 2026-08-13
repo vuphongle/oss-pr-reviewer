@@ -1,5 +1,5 @@
 name: oss-pr-reviewer
-description: Run an advisory AI review for a pull_request and append the Markdown report to the job summary.
+description: Run an advisory AI review for a pull_request, append the report to the job summary, and optionally update a PR comment.
 author: oss-pr-reviewer maintainers
 inputs:
   github-token:
@@ -15,6 +15,17 @@ inputs:
   min-severity:
     description: Minimum finding severity to include in the report.
     required: false
+  post-comment:
+    description: Publish or update the review comment on the pull request. Must be true or false.
+    required: false
+    default: 'false'
+outputs:
+  comment-action:
+    description: Whether the comment was created, updated, or skipped.
+  comment-id:
+    description: ID of the created or updated comment, when comment mode is enabled.
+  comment-url:
+    description: URL of the created or updated comment, when available.
 runs:
   using: composite
   steps:
@@ -26,6 +37,7 @@ runs:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         ACTION_MODEL: ${{ inputs.model }}
         ACTION_MIN_SEVERITY: ${{ inputs.min-severity }}
+        ACTION_POST_COMMENT: ${{ inputs.post-comment }}
       run: |
         set -euo pipefail
         npm ci --ignore-scripts --prefix "$ACTION_PATH"
