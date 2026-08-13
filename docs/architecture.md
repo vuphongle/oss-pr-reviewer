@@ -1,6 +1,6 @@
 # Architecture
 
-`oss-pr-reviewer` is a single-process CLI. It fetches only the requested pull request and changed-file patches; it does not clone or execute the repository.
+`oss-pr-reviewer` is a single-process CLI. It fetches only the requested pull request, trusted-base configuration, and changed-file patches; it does not clone or execute the repository.
 
 ```text
 CLI

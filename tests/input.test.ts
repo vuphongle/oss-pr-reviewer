@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import process from 'node:process';
+import { readFile } from 'node:fs/promises';
+import { URL } from 'node:url';
 
 import { parsePullRequestUrl, parseRepository } from '../src/github/types.js';
 import { executeReview } from '../src/cli/commands/review.js';
 
 describe('CLI input parsing', () => {
+  it('keeps the CLI version aligned with release metadata', async () => {
+    const packageJson = JSON.parse(
+      await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+    ) as { version: string };
+    expect(packageJson.version).toBe('0.2.0');
+  });
   it('parses owner/repository', () =>
     expect(parseRepository('octo/project')).toEqual({ owner: 'octo', repository: 'project' }));
   it('rejects malformed repositories', () =>

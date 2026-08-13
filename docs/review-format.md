@@ -1,6 +1,6 @@
 # Review Format
 
-The CLI emits Markdown with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer.
+The CLI emits Markdown with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. v0.2.0 statistics also include files changed, files ignored by configuration, and review batches.
 
 ## Severity
 
@@ -23,4 +23,4 @@ Each finding includes a title, file, optional line, evidence-based explanation, 
 
 ## Interpretation
 
-Read findings as maintainer leads for further investigation. The model sees the pull request metadata and reviewable patches only. Missing context, truncated patches, generated files, binary files, and deleted files can limit accuracy. Automated output does not replace human review, testing, or a security audit.
+Read findings as maintainer leads for further investigation. The model sees the pull request metadata, trusted-base repository guidance, and reviewable patches only. Missing context, truncated patches, generated files, binary files, deleted files, ignored files, and oversized content can limit accuracy. Automated output does not replace human review, testing, or a security audit.
