@@ -1,6 +1,8 @@
 import type { RepositoryReference } from './types.js';
+import { prepareReviewComment } from './comment-safety.js';
+import { OSS_PR_REVIEWER_MARKER } from './comment-constants.js';
 
-export const OSS_PR_REVIEWER_MARKER = '<!-- oss-pr-reviewer -->';
+export { OSS_PR_REVIEWER_MARKER } from './comment-constants.js';
 const OWNED_COMMENT_AUTHORS = new Set(['github-actions[bot]', 'oss-pr-reviewer[bot]']);
 
 export interface ReviewComment {
@@ -58,7 +60,7 @@ export async function publishReviewComment(
   pullRequestNumber: number,
   report: string,
 ): Promise<PublishedReviewComment> {
-  const body = `${OSS_PR_REVIEWER_MARKER}\n\n${report}`;
+  const body = prepareReviewComment(report).body;
   const existing = await findReviewComment(client, reference, pullRequestNumber);
   try {
     if (existing) {
