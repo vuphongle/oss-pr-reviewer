@@ -7,9 +7,12 @@ import {
 } from '../src/action/inputs.js';
 import { parsePullRequestEvent } from '../src/action/event.js';
 import { writeActionReport } from '../src/action/output.js';
+import { assertActionCredentialsAvailable } from '../src/action/security.js';
+import { readFile as readTextFile } from 'node:fs/promises';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { URL } from 'node:url';
 
 describe('GitHub Action inputs', () => {
   it('parses required credentials and optional review settings', () => {
@@ -71,7 +74,45 @@ describe('GitHub pull request event', () => {
     ).toEqual({
       url: 'https://github.com/octo/project/pull/12',
       number: 12,
+      isFork: false,
     });
+  });
+
+  it('marks pull requests from fork repositories without changing the event source', () => {
+    expect(
+      parsePullRequestEvent({
+        action: 'opened',
+        pull_request: {
+          number: 12,
+          html_url: 'https://github.com/octo/project/pull/12',
+          base: { repo: { full_name: 'octo/project' } },
+          head: { repo: { full_name: 'contributor/project' } },
+        },
+      }).isFork,
+    ).toBe(true);
+  });
+
+  it('recognizes same-repository pull requests as non-fork events', () => {
+    expect(
+      parsePullRequestEvent({
+        action: 'reopened',
+        pull_request: {
+          number: 12,
+          html_url: 'https://github.com/octo/project/pull/12',
+          base: { repo: { full_name: 'octo/project' } },
+          head: { repo: { full_name: 'octo/project' } },
+        },
+      }).isFork,
+    ).toBe(false);
+  });
+
+  it('explains why fork workflows cannot review without an OpenAI secret', () => {
+    expect(() =>
+      assertActionCredentialsAvailable(
+        { url: 'https://github.com/octo/project/pull/12', number: 12, isFork: true },
+        {},
+      ),
+    ).toThrow(/does not expose repository secrets to pull_request workflows from forks/);
   });
 
   it('rejects unsupported actions and missing pull request metadata', () => {
@@ -82,6 +123,16 @@ describe('GitHub pull request event', () => {
       }),
     ).toThrow(/opened, synchronize, or reopened/);
     expect(() => parsePullRequestEvent({ action: 'opened' })).toThrow(/pull_request/);
+  });
+});
+
+describe('GitHub Action security documentation', () => {
+  it('documents fork secret limitations and the pull_request trust model', async () => {
+    const security = await readTextFile(new URL('../SECURITY.md', import.meta.url), 'utf8');
+    expect(security).toMatch(/pull_request/);
+    expect(security).toMatch(/fork/i);
+    expect(security).toMatch(/pull_request_target/);
+    expect(security).toMatch(/GITHUB_STEP_SUMMARY/);
   });
 });
 
