@@ -172,6 +172,18 @@ describe('GitHub Action security documentation', () => {
     expect(workflow).not.toMatch(/pull_request_target/);
   });
 
+  it('documents explicit write permission for opt-in comment mode', async () => {
+    const workflow = await readTextFile(
+      new URL('../examples/github-actions/comment.yml', import.meta.url),
+      'utf8',
+    );
+    expect(workflow).toMatch(/pull_request:/);
+    expect(workflow).toMatch(/pull-requests: write/);
+    expect(workflow).toMatch(/post-comment: true/);
+    expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.4\.0/);
+    expect(workflow).not.toMatch(/pull_request_target/);
+  });
+
   it('declares opt-in comment mode and stable outputs in action.yml', async () => {
     const action = await readTextFile(new URL('../action.yml', import.meta.url), 'utf8');
     expect(action).toMatch(/post-comment:/);

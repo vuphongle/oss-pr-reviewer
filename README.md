@@ -106,7 +106,7 @@ The file is loaded from the pull request's base commit, not the PR branch, so a 
 
 ## GitHub Actions
 
-v0.3.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and appends the Markdown report to the job summary. It does not post comments or execute the reviewed PR.
+v0.4.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and always appends the Markdown report to the job summary. With `post-comment: true`, it also creates or updates one owned PR comment without posting duplicates.
 
 ```yaml
 name: AI PR Review
@@ -123,13 +123,14 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: vuphongle/oss-pr-reviewer@v0.3.0
+      - uses: vuphongle/oss-pr-reviewer@v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          post-comment: true
 ```
 
-Live Action reviews require `OPENAI_API_KEY`; tests and local development do not. Fork pull requests normally cannot access repository secrets under `pull_request`, so do not switch to `pull_request_target` casually. See [docs/github-actions.md](docs/github-actions.md) for permissions, inputs, security boundaries, and limitations.
+Comment mode requires `pull-requests: write`; summary-only mode needs only `pull-requests: read`. Live Action reviews require `OPENAI_API_KEY`; tests and local development do not. Fork pull requests normally cannot access repository secrets under `pull_request`, so do not switch to `pull_request_target` casually. See [docs/github-actions.md](docs/github-actions.md) for both workflow examples, permissions, inputs, security boundaries, and limitations.
 
 ## CLI Usage
 
@@ -187,7 +188,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
 - GitHub-truncated, missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
-- The GitHub Action does not post comments or create annotations; it writes a job summary only. The CLI does not clone repositories or run tests.
+- The GitHub Action does not create annotations or enforce a merge policy. Comment mode is bounded and advisory; the CLI does not clone repositories or run tests.
 - Live API usage requires network access and valid credentials; automated tests use mocks.
 
 ## Development and Testing

@@ -31,7 +31,9 @@ Finding merge / deduplicate / filter
   |
 Markdown renderer
   |
-GITHUB_STEP_SUMMARY
+  +--> GITHUB_STEP_SUMMARY (always)
+  |
+  +--> Optional PR comment adapter (create/update)
 ```
 
 ## Boundaries
@@ -48,9 +50,10 @@ GITHUB_STEP_SUMMARY
 - `src/report/` renders the final report without making claims that automated review is definitive.
 - `action.yml` is a thin composite Action. It builds and runs only the trusted Action checkout, parses supported pull request event metadata, and appends the existing Markdown report to the job summary.
 - `src/action/` contains testable Action-boundary code for event parsing, input validation, secret redaction, fork limitations, and summary output. It does not duplicate review logic.
+- `src/github/comments.ts` owns marker-based comment discovery and create/update behavior. `src/github/comment-safety.ts` bounds and sanitizes comment output without changing the full summary report.
 
 Custom rule descriptions are passed as untrusted user-context guidance. They cannot replace or modify the system review policy.
 
 The review prompt labels all pull request content as untrusted data. No changed code is executed, and no repository content outside the supplied pull request is sent to the provider.
 
-The documented workflow uses `pull_request`, read-only permissions, and a tagged Action release. Fork pull requests normally cannot receive repository secrets; the Action does not use `pull_request_target` as a workaround.
+The documented workflows use `pull_request` and tagged Action releases. Summary-only mode uses read permissions; comment mode explicitly adds `pull-requests: write`. Fork pull requests normally cannot receive repository secrets; the Action does not use `pull_request_target` as a workaround.
