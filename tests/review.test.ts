@@ -34,6 +34,7 @@ describe('normalization and batching', () => {
       'assets/logo.png',
       'src/removed.ts',
     ]);
+    expect(normalized.skipped[0]?.reason).toBe('binary asset');
   });
   it('creates multiple deterministic batches', () => {
     const files = Array.from({ length: 3 }, (_, index) => ({

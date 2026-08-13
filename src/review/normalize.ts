@@ -22,7 +22,7 @@ export function normalizeFiles(files: ChangedFile[]): NormalizedFiles {
       ? `.${file.path.split('.').pop()!.toLowerCase()}`
       : '';
     if (binaryExtensions.has(extension)) {
-      skipped.push({ path: file.path, reason: 'binary or generated asset' });
+      skipped.push({ path: file.path, reason: 'binary asset' });
       continue;
     }
     if (!file.patch) {

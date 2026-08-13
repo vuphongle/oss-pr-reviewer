@@ -14,15 +14,15 @@ export const categorySchema = z.enum([
 export const findingSchema = z.object({
   severity: severitySchema,
   category: categorySchema,
-  title: z.string().min(1),
-  file: z.string().min(1),
+  title: z.string().trim().min(1),
+  file: z.string().trim().min(1),
   line: z.number().int().positive().nullable(),
-  explanation: z.string().min(1),
-  recommendation: z.string().min(1),
+  explanation: z.string().trim().min(1),
+  recommendation: z.string().trim().min(1),
 });
 
 export const reviewResultSchema = z.object({
-  summary: z.string().min(1),
+  summary: z.string().trim().min(1),
   riskLevel: severitySchema,
   findings: z.array(findingSchema),
 });

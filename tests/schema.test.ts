@@ -14,4 +14,12 @@ describe('review response schema', () => {
     expect(() => parseReviewResult({ ...resultFixture(), riskLevel: 'urgent' })).toThrow(
       /schema validation/,
     ));
+  it('rejects whitespace-only text fields', () =>
+    expect(() =>
+      parseReviewResult({
+        ...resultFixture(),
+        summary: '   ',
+        findings: [{ ...resultFixture().findings[0], title: '   ' }],
+      }),
+    ).toThrow(/schema validation/));
 });
