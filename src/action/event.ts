@@ -5,6 +5,7 @@ const supportedActions = new Set(['opened', 'synchronize', 'reopened']);
 export interface PullRequestEvent {
   url: string;
   number: number;
+  isFork: boolean;
 }
 
 export function parsePullRequestEvent(value: unknown): PullRequestEvent {
@@ -14,7 +15,12 @@ export function parsePullRequestEvent(value: unknown): PullRequestEvent {
 
   const event = value as {
     action?: unknown;
-    pull_request?: { number?: unknown; html_url?: unknown };
+    pull_request?: {
+      number?: unknown;
+      html_url?: unknown;
+      base?: { repo?: { full_name?: unknown } };
+      head?: { repo?: { full_name?: unknown } };
+    };
   };
   if (typeof event.action !== 'string' || !supportedActions.has(event.action)) {
     throw new Error('This Action supports only opened, synchronize, or reopened pull requests.');
@@ -27,5 +33,9 @@ export function parsePullRequestEvent(value: unknown): PullRequestEvent {
   if (event.pull_request.number !== undefined && event.pull_request.number !== parsed.number) {
     throw new Error('GitHub event pull request number does not match its URL.');
   }
-  return { url: event.pull_request.html_url, number: parsed.number };
+  const baseName = event.pull_request.base?.repo?.full_name;
+  const headName = event.pull_request.head?.repo?.full_name;
+  const isFork =
+    typeof baseName === 'string' && typeof headName === 'string' && baseName !== headName;
+  return { url: event.pull_request.html_url, number: parsed.number, isFork };
 }
