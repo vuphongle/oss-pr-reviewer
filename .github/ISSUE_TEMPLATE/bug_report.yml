@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem with the CLI or review pipeline.
+title: 'bug: '
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove API keys, tokens, private repository data, and other secrets from all fields.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node.js version, operating system, and oss-pr-reviewer version or commit.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The command that reproduces the issue, with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction details
+      description: Include relevant logs or a minimal synthetic fixture. Do not include credentials or private code.
+    validations:
+      required: true

@@ -43,20 +43,27 @@ npm install
 npm run build
 ```
 
-For a published package, install it globally with npm. The repository is the source of truth for the initial release while publication is maintained separately.
+The v0.1.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
+
+```bash
+npm link
+oss-pr-reviewer --help
+```
 
 ## Quick Start
 
 ```bash
-export GITHUB_TOKEN=your-github-token
-export OPENAI_API_KEY=your-openai-key
+export GITHUB_TOKEN=...
+export OPENAI_API_KEY=...
 
-npx oss-pr-reviewer review \
+node dist/cli/index.js review \
   --repo owner/repository \
   --pr 123 \
   --min-severity medium \
   --output review.md
 ```
+
+Live pull request review requires GitHub/OpenAI credentials. Development and automated tests do not.
 
 Authenticated GitHub access is recommended to avoid anonymous API rate limits. The CLI does not require a token for every public repository request, but GitHub may reject or limit unauthenticated access.
 
@@ -74,14 +81,14 @@ OPENAI_API_KEY=
 ## CLI Usage
 
 ```bash
-oss-pr-reviewer --help
-oss-pr-reviewer review --help
+node dist/cli/index.js --help
+node dist/cli/index.js review --help
 
-oss-pr-reviewer review --repo owner/repository --pr 123
-oss-pr-reviewer review --url https://github.com/owner/repository/pull/123
-oss-pr-reviewer review --repo owner/repository --pr 123 --model gpt-4o-mini
-oss-pr-reviewer review --repo owner/repository --pr 123 --min-severity high
-oss-pr-reviewer review --repo owner/repository --pr 123 --output review.md
+node dist/cli/index.js review --repo owner/repository --pr 123
+node dist/cli/index.js review --url https://github.com/owner/repository/pull/123
+node dist/cli/index.js review --repo owner/repository --pr 123 --model gpt-4o-mini
+node dist/cli/index.js review --repo owner/repository --pr 123 --min-severity high
+node dist/cli/index.js review --repo owner/repository --pr 123 --output review.md
 ```
 
 `--repo` and `--pr` must be supplied together. `--url` is mutually exclusive with that pair. Supported minimum severities are `low`, `medium`, `high`, and `critical`. A high or critical finding does not make the process fail; configuration, API, filesystem, and validation failures return a non-zero exit code.
@@ -107,7 +114,7 @@ The changed endpoint does not appear to validate the caller's permissions.
 Validate permissions before processing the request.
 ```
 
-The full report also includes pull request metadata, summary, statistics, skipped files, and a disclaimer. See [docs/review-format.md](docs/review-format.md).
+The full report also includes pull request metadata, summary, statistics, skipped files, and a disclaimer. See the synthetic example at [examples/sample-review.md](examples/sample-review.md) and [docs/review-format.md](docs/review-format.md).
 
 ## Architecture
 
@@ -139,7 +146,7 @@ npm run test
 npm run build
 ```
 
-Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same quality gates on pushes and pull requests.
+Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same quality gates on pushes and pull requests. Live API smoke testing remains a maintainer task because it requires credentials.
 
 ## Roadmap
 
