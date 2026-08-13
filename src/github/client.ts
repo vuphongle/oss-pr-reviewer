@@ -4,13 +4,14 @@ import { Buffer } from 'node:buffer';
 import type { PullRequest } from '../types.js';
 import type { RepositoryReference } from './types.js';
 import type { RepositoryFileReader } from '../config/repository.js';
+import type { ReviewComment, ReviewCommentClient } from './comments.js';
 
 interface GithubClientOptions {
   token?: string;
   octokit?: Octokit;
 }
 
-export class GithubClient implements RepositoryFileReader {
+export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
   private readonly octokit: Octokit;
 
   constructor(options: GithubClientOptions = {}) {
@@ -72,6 +73,67 @@ export class GithubClient implements RepositoryFileReader {
     } catch (error) {
       const candidate = error as { status?: number };
       if (candidate.status === 404) return undefined;
+      throw normalizeGithubError(error);
+    }
+  }
+
+  async listComments(
+    reference: RepositoryReference,
+    pullRequestNumber: number,
+  ): Promise<ReviewComment[]> {
+    try {
+      const comments = await this.octokit.paginate(this.octokit.issues.listComments, {
+        owner: reference.owner,
+        repo: reference.repository,
+        issue_number: pullRequestNumber,
+        per_page: 100,
+      });
+      return comments.map((comment) => ({
+        id: comment.id,
+        body: comment.body ?? '',
+        htmlUrl: comment.html_url,
+        user: comment.user
+          ? { type: comment.user.type, login: comment.user.login ?? undefined }
+          : undefined,
+      }));
+    } catch (error) {
+      throw normalizeGithubError(error);
+    }
+  }
+
+  async createComment(
+    reference: RepositoryReference,
+    pullRequestNumber: number,
+    body: string,
+  ): Promise<Pick<ReviewComment, 'id' | 'htmlUrl'>> {
+    try {
+      const response = await this.octokit.issues.createComment({
+        owner: reference.owner,
+        repo: reference.repository,
+        issue_number: pullRequestNumber,
+        body,
+      });
+      return { id: response.data.id, htmlUrl: response.data.html_url };
+    } catch (error) {
+      throw normalizeGithubError(error);
+    }
+  }
+
+  async updateComment(
+    reference: RepositoryReference,
+    pullRequestNumber: number,
+    commentId: number,
+    body: string,
+  ): Promise<Pick<ReviewComment, 'id' | 'htmlUrl'>> {
+    try {
+      const response = await this.octokit.issues.updateComment({
+        owner: reference.owner,
+        repo: reference.repository,
+        comment_id: commentId,
+        body,
+      });
+      return { id: response.data.id, htmlUrl: response.data.html_url };
+    } catch (error) {
       throw normalizeGithubError(error);
     }
   }
