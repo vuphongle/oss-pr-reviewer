@@ -1,6 +1,6 @@
 # Repository Configuration
 
-v0.2.0 supports an optional `.oss-pr-reviewer.yml` file at the repository root. Configuration is read from the pull request's trusted base commit, not from the pull request head. This prevents a pull request from changing the review policy used to inspect its own changes.
+v0.3.0 supports the optional `.oss-pr-reviewer.yml` file at the repository root. Configuration is read from the pull request's trusted base commit, not from the pull request head. This prevents a pull request from changing the review policy used to inspect its own changes. The same behavior is used by the GitHub Action.
 
 ## Example
 

@@ -13,7 +13,7 @@ const program = new Command()
   .description(
     'AI-powered CLI for reviewing GitHub pull requests with structured Markdown reports.',
   )
-  .version('0.2.0');
+  .version('0.3.0');
 
 program
   .command('review')
