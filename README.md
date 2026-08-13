@@ -84,7 +84,7 @@ OPENAI_API_KEY=
 
 ### Repository configuration
 
-v0.2 supports an optional `.oss-pr-reviewer.yml` file:
+`oss-pr-reviewer` supports an optional `.oss-pr-reviewer.yml` file:
 
 ```yaml
 version: 1
@@ -127,7 +127,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          post-comment: true
 ```
 
 Comment mode requires `pull-requests: write`; summary-only mode needs only `pull-requests: read`. Live Action reviews require `OPENAI_API_KEY`; tests and local development do not. Fork pull requests normally cannot access repository secrets under `pull_request`, so do not switch to `pull_request_target` casually. See [docs/github-actions.md](docs/github-actions.md) for both workflow examples, permissions, inputs, security boundaries, and limitations.
@@ -172,7 +171,7 @@ The full report also includes pull request metadata, summary, statistics, skippe
 
 ## Architecture
 
-The CLI depends on a small `ReviewProvider` interface, so the review engine does not contain OpenAI SDK details. v0.3.0 ships one provider: OpenAI. Review content, repository rules, and ignored-path configuration are treated as untrusted repository data; changed code is never executed. See [docs/architecture.md](docs/architecture.md).
+The CLI depends on a small `ReviewProvider` interface, so the review engine does not contain OpenAI SDK details. The current release ships one provider: OpenAI. Review content, repository rules, and ignored-path configuration are treated as untrusted repository data; changed code is never executed. See [docs/architecture.md](docs/architecture.md).
 
 ## Review Philosophy
 
@@ -184,7 +183,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 
 ## Limitations
 
-- Only OpenAI is implemented in v0.3.0.
+- Only OpenAI is implemented as a provider.
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
 - GitHub-truncated, missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
@@ -205,9 +204,7 @@ Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same
 
 ## Roadmap
 
-These are possible future directions, not current features:
-
-- **v0.4:** optional PR comments or annotations, subject to a separate permission and duplicate-output design.
+Possible future directions include GitHub annotations and other maintainer-focused improvements informed by real-world usage.
 
 ## License
 
