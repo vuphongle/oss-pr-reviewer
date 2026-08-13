@@ -1,0 +1,20 @@
+name: AI PR Review With Comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run oss-pr-reviewer with PR comment output
+        uses: vuphongle/oss-pr-reviewer@v0.4.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          post-comment: true

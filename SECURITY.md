@@ -17,6 +17,7 @@ Only the latest release line is actively supported. Security fixes may be backpo
 - The CLI never executes changed code or arbitrary shell commands from a pull request.
 - The reusable Action is intended for the `pull_request` event with least-privilege `contents: read` and `pull-requests: read` permissions. It does not use `pull_request_target`, which has a different trust model and can expose secrets to untrusted workflow context.
 - GitHub does not expose repository secrets to workflows triggered by pull requests from forks. Fork reviews therefore need an explicit maintainer-approved credential strategy; the Action does not bypass this restriction.
-- The Action runs the trusted Action checkout only. It does not check out or execute the contributor's pull request, and it appends the Markdown report to `GITHUB_STEP_SUMMARY` rather than posting comments by default.
+- The Action runs the trusted Action checkout only. It does not check out or execute the contributor's pull request. It always appends the full Markdown report to `GITHUB_STEP_SUMMARY`; optional comment mode requires explicit workflow input and `pull-requests: write`.
+- Comment updates require the stable `<!-- oss-pr-reviewer -->` marker and an expected bot author. Unrelated user comments are not modified, older duplicate tool comments are not deleted, and comment bodies are bounded and mention-neutralized before publishing.
 - Reports may contain code-derived text, so review output before sharing it outside the intended maintainer context.
 - Provider and GitHub errors are normalized without intentionally printing credentials.
