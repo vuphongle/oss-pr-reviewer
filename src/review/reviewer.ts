@@ -34,7 +34,7 @@ export async function reviewPullRequest(
     return {
       result: {
         summary: 'No reviewable text patches were available in this pull request.',
-        riskLevel: 'low',
+        riskLevel: 'unknown',
         findings: [],
       },
       skippedFiles,
@@ -54,11 +54,16 @@ export async function reviewPullRequest(
     deduplicateFindings(results.flatMap((result) => result.findings)),
     minimumSeverity,
   );
-  const riskLevel = results.reduce<Severity>(
-    (highest, result) =>
-      severityOrder[result.riskLevel] > severityOrder[highest] ? result.riskLevel : highest,
-    'low',
-  );
+  const riskLevel =
+    findings.length === 0
+      ? 'unknown'
+      : findings.reduce<Severity>(
+          (highest, finding) =>
+            severityOrder[finding.severity] > severityOrder[highest]
+              ? finding.severity
+              : highest,
+          'low',
+        );
   const summary = results
     .map((result) => result.summary.trim())
     .filter(Boolean)
