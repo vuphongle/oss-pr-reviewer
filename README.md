@@ -21,6 +21,8 @@ Pull request review often starts with the same context-gathering work: finding t
 - Validate OpenAI JSON responses with Zod.
 - Deduplicate identical findings and apply deterministic severity filtering.
 - Print Markdown to stdout or write it to `--output`.
+- Emit structured JSON output with `--output-format json` for CI integration.
+- Retry transient OpenAI and GitHub API failures (HTTP 429, 5xx) with exponential backoff.
 - Run lint, typecheck, tests, and build in GitHub Actions without live review secrets.
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
@@ -142,6 +144,7 @@ node dist/cli/index.js review --url https://github.com/owner/repository/pull/123
 node dist/cli/index.js review --repo owner/repository --pr 123 --model gpt-4o-mini
 node dist/cli/index.js review --repo owner/repository --pr 123 --min-severity high
 node dist/cli/index.js review --repo owner/repository --pr 123 --output review.md
+node dist/cli/index.js review --repo owner/repository --pr 123 --output review.json --output-format json
 ```
 
 `--repo` and `--pr` must be supplied together. `--url` is mutually exclusive with that pair. Supported minimum severities are `low`, `medium`, `high`, and `critical`. A high or critical finding does not make the process fail; configuration, API, filesystem, and validation failures return a non-zero exit code.

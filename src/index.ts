@@ -8,6 +8,7 @@ export * from './review/schema.js';
 export * from './review/severity.js';
 export * from './review/ignore.js';
 export * from './report/markdown.js';
+export * from './report/json.js';
 export * from './ai/provider.js';
 export * from './ai/client.js';
 export * from './config/repository.js';

@@ -70,7 +70,7 @@ function countFindings(findings: ReviewFinding[]): Record<Severity, number> {
       counts[finding.severity] += 1;
       return counts;
     },
-    { critical: 0, high: 0, medium: 0, low: 0 },
+    { unknown: 0, critical: 0, high: 0, medium: 0, low: 0 },
   );
 }
 

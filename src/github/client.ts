@@ -5,18 +5,33 @@ import type { PullRequest } from '../types.js';
 import type { RepositoryReference } from './types.js';
 import type { RepositoryFileReader } from '../config/repository.js';
 import type { ReviewComment, ReviewCommentClient } from './comments.js';
+import { retry, isRetryable } from '../ai/client.js';
+
+export interface GithubRetryOptions {
+  maxRetries?: number;
+  backoffMs?: (attempt: number, error: unknown) => number;
+}
 
 interface GithubClientOptions {
   token?: string;
   octokit?: Octokit;
+  retry?: GithubRetryOptions;
 }
+
+const DEFAULT_MAX_RETRIES = 2;
+const exponentialBackoff = (attempt: number): number =>
+  Math.min(1000 * 2 ** (attempt - 1), 8000);
 
 export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
   private readonly octokit: Octokit;
+  private readonly maxRetries: number;
+  private readonly backoffMs: (attempt: number, error: unknown) => number;
 
   constructor(options: GithubClientOptions = {}) {
     this.octokit =
       options.octokit ?? new Octokit(options.token ? { auth: options.token } : undefined);
+    this.maxRetries = options.retry?.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.backoffMs = options.retry?.backoffMs ?? exponentialBackoff;
   }
 
   async getPullRequest(reference: RepositoryReference, number: number): Promise<PullRequest> {
@@ -62,12 +77,14 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
     ref: string,
   ): Promise<string | undefined> {
     try {
-      const response = await this.octokit.repos.getContent({
-        owner: reference.owner,
-        repo: reference.repository,
-        path,
-        ref,
-      });
+      const response = await retry(this.maxRetries, this.backoffMs, () =>
+        this.octokit.repos.getContent({
+          owner: reference.owner,
+          repo: reference.repository,
+          path,
+          ref,
+        }),
+      );
       if (!('content' in response.data) || response.data.type !== 'file') return undefined;
       return Buffer.from(response.data.content, 'base64').toString('utf8');
     } catch (error) {
@@ -139,7 +156,7 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
   }
 }
 
-function normalizeGithubError(error: unknown): Error {
+export function normalizeGithubError(error: unknown): Error {
   const candidate = error as { status?: number; message?: string };
   if (candidate.status === 401)
     return new Error('GitHub authentication failed. Check GITHUB_TOKEN.');
@@ -149,6 +166,8 @@ function normalizeGithubError(error: unknown): Error {
     );
   if (candidate.status === 404)
     return new Error('GitHub pull request was not found or is not accessible.');
+  if (isRetryable(error))
+    return new Error('GitHub service is temporarily unavailable. Retry later.');
   return new Error(
     `GitHub API request failed${candidate.message ? `: ${candidate.message}` : '.'}`,
   );
