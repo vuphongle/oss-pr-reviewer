@@ -22,6 +22,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Deduplicate identical findings and apply deterministic severity filtering.
 - Print Markdown to stdout or write it to `--output`.
 - Emit structured JSON output with `--output-format json` for CI integration.
+- Retry transient OpenAI and GitHub API failures (HTTP 429, 5xx) with exponential backoff.
 - Run lint, typecheck, tests, and build in GitHub Actions without live review secrets.
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
