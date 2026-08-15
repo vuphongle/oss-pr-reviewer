@@ -90,6 +90,35 @@ describe('GitHub client', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('retries transient GitHub API failures', async () => {
+    const getContent = vi
+      .fn()
+      .mockRejectedValueOnce({ status: 502, message: 'bad gateway' })
+      .mockResolvedValueOnce({ data: { type: 'file', content: Buffer.from('ok').toString('base64') } });
+    const octokit = { repos: { getContent } } as never;
+    await expect(
+      new GithubClient({ octokit, retry: { maxRetries: 1, backoffMs: () => 0 } }).getFileAtRef(
+        reference,
+        '.oss-pr-reviewer.yml',
+        'base-sha',
+      ),
+    ).resolves.toBe('ok');
+    expect(getContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry GitHub 404 responses when reading files', async () => {
+    const getContent = vi.fn().mockRejectedValue({ status: 404 });
+    const octokit = { repos: { getContent } } as never;
+    await expect(
+      new GithubClient({ octokit, retry: { maxRetries: 3, backoffMs: () => 0 } }).getFileAtRef(
+        reference,
+        '.oss-pr-reviewer.yml',
+        'base-sha',
+      ),
+    ).resolves.toBeUndefined();
+    expect(getContent).toHaveBeenCalledOnce();
+  });
+
   it('normalizes PR comment list, create, and update API calls', async () => {
     const octokit = {
       issues: {
