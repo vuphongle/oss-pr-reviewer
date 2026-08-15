@@ -21,7 +21,8 @@ program
   .option('--repo <owner/repository>', 'repository identifier; requires --pr')
   .option('--pr <number>', 'pull request number; requires --repo')
   .option('--url <url>', 'GitHub pull request URL')
-  .option('--output <path>', 'write Markdown report to a file instead of only stdout')
+  .option('--output <path>', 'write report to a file instead of only stdout')
+  .option('--output-format <format>', 'report format (markdown, json)', 'markdown')
   .option('--model <model-name>', 'OpenAI model name', 'gpt-4o-mini')
   .option('--min-severity <severity>', 'minimum finding severity (low, medium, high, critical)')
   .action(
@@ -30,6 +31,7 @@ program
       pr?: string;
       url?: string;
       output?: string;
+      outputFormat?: string;
       model?: string;
       minSeverity?: string;
     }) => {
@@ -38,9 +40,16 @@ program
           `Unsupported severity '${options.minSeverity}'. Choose low, medium, high, or critical.`,
         );
       }
+      const outputFormat = options.outputFormat ?? 'markdown';
+      if (outputFormat !== 'markdown' && outputFormat !== 'json') {
+        throw new Error(
+          `Unsupported output format '${outputFormat}'. Choose markdown or json.`,
+        );
+      }
       const report = await executeReview({
         ...options,
         minSeverity: options.minSeverity as Severity | undefined,
+        outputFormat,
       });
       if (!options.output) process.stdout.write(report);
     },
