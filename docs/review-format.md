@@ -1,19 +1,22 @@
 # Review Format
 
-The CLI emits Markdown with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. The report includes statistics such as files changed, files ignored by configuration, and review batches. The GitHub Action places the same report in the Actions job summary.
+The CLI emits a structured report with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. The report includes statistics such as files changed, files ignored by configuration, and review batches. The GitHub Action places the same report in the Actions job summary.
+
+By default the report is rendered as Markdown. `--output-format json` emits the same `ReviewReportData` shape as deterministic JSON for CI integration and downstream tooling. The JSON contains `pullRequest`, `result` (with `summary`, `riskLevel`, and `findings`), `skippedFiles`, and the same count fields as the Markdown statistics block. Findings with `riskLevel: unknown` mean no review was performed (no reviewable patches or all findings filtered out).
 
 ## Severity
 
+- `unknown`: no review was performed for this pull request (no reviewable text patches, or every finding was filtered out by the minimum severity).
 - `critical`: evidence of a severe security, data-loss, or system-breaking issue.
 - `high`: a likely serious bug, security problem, regression, or breaking behavior.
 - `medium`: a meaningful correctness, test, error-handling, or maintainability concern.
 - `low`: a lower-impact issue that is still actionable and supported by the diff.
 
-`--min-severity` is applied deterministically after provider responses are validated. The order is `low < medium < high < critical`.
+`--min-severity` is applied deterministically after provider responses are validated. The order is `unknown < low < medium < high < critical`. Findings cannot be reported at the `unknown` level.
 
 ## Risk level
 
-The provider returns one aggregate risk level for the reviewed batch. The final report uses the highest risk level returned across batches. Risk is an assessment of review context, not a guarantee about the pull request.
+Risk is derived from the filtered findings, so a report with no surviving findings (no reviewable patches or every finding below `--min-severity`) reports `riskLevel: unknown`. When findings survive filtering, the final report uses the highest severity among them. Risk is an assessment of review context, not a guarantee about the pull request.
 
 ## Categories
 
