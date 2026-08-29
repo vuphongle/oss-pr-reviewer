@@ -12,6 +12,8 @@ describe('Markdown report', () => {
       skippedFiles: [],
       reviewedFileCount: 2,
       changedFileCount: 2,
+      fileListStatus: 'complete',
+      truncatedFileCount: 0,
       ignoredFileCount: 0,
       batchCount: 1,
     });
@@ -30,6 +32,8 @@ describe('Markdown report', () => {
       skippedFiles: [{ path: 'logo.png', reason: 'binary' }],
       reviewedFileCount: 1,
       changedFileCount: 2,
+      fileListStatus: 'complete',
+      truncatedFileCount: 0,
       ignoredFileCount: 0,
       batchCount: 1,
     });
@@ -46,11 +50,32 @@ describe('Markdown report', () => {
       skippedFiles: [{ path: 'image.png', reason: 'binary asset' }],
       reviewedFileCount: 0,
       changedFileCount: 1,
+      fileListStatus: 'complete',
+      truncatedFileCount: 0,
       ignoredFileCount: 0,
       batchCount: 0,
     });
     expect(report).toContain('- Risk: Unknown');
     expect(report).toContain('No significant issues');
+  });
+  it('prominently marks truncated GitHub file lists as incomplete', () => {
+    const report = renderMarkdown({
+      pullRequest: { ...pullRequestFixture, changedFileCount: 3001 },
+      result: resultFixture({ findings: [] }),
+      skippedFiles: [],
+      reviewedFileCount: 1,
+      changedFileCount: 3001,
+      fileListStatus: 'incomplete',
+      truncatedFileCount: 2998,
+      ignoredFileCount: 0,
+      batchCount: 1,
+    });
+
+    expect(report).toContain('> [!WARNING]');
+    expect(report).toContain('GitHub returned 3 of 3001 changed files');
+    expect(report).toContain('This review is incomplete');
+    expect(report).toContain('Files unavailable: 2998');
+    expect(report).toContain('## Skipped Files\n\n- None');
   });
 });
 
@@ -66,6 +91,8 @@ describe('JSON report', () => {
     skippedFiles: [{ path: 'logo.png', reason: 'binary' }],
     reviewedFileCount: 1,
     changedFileCount: 2,
+    fileListStatus: 'complete' as const,
+    truncatedFileCount: 0,
     ignoredFileCount: 0,
     batchCount: 1,
   };
@@ -78,6 +105,8 @@ describe('JSON report', () => {
     expect(parsed.skippedFiles).toEqual([{ path: 'logo.png', reason: 'binary' }]);
     expect(parsed.reviewedFileCount).toBe(1);
     expect(parsed.changedFileCount).toBe(2);
+    expect(parsed.fileListStatus).toBe('complete');
+    expect(parsed.truncatedFileCount).toBe(0);
     expect(parsed.batchCount).toBe(1);
   });
 

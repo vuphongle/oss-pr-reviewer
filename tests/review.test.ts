@@ -83,14 +83,30 @@ describe('review pipeline', () => {
     expect(execution.skippedFiles).toHaveLength(2);
     expect(execution.reviewedFileCount).toBe(1);
     expect(execution.changedFileCount).toBe(3);
+    expect(execution.fileListStatus).toBe('complete');
+    expect(execution.truncatedFileCount).toBe(0);
     expect(execution.ignoredFileCount).toBe(0);
     expect(execution.batchCount).toBe(1);
+  });
+
+  it('marks the review incomplete when GitHub returns fewer files than it reports', async () => {
+    const provider: ReviewProvider = { review: async () => resultFixture({ findings: [] }) };
+    const execution = await reviewPullRequest(
+      { ...pullRequestFixture, changedFileCount: 5 },
+      provider,
+    );
+
+    expect(execution.changedFileCount).toBe(5);
+    expect(execution.fileListStatus).toBe('incomplete');
+    expect(execution.truncatedFileCount).toBe(2);
+    expect(execution.skippedFiles).toHaveLength(2);
   });
   it('returns a useful empty result when no patches are reviewable', async () => {
     const provider: ReviewProvider = { review: async () => resultFixture() };
     const execution = await reviewPullRequest(
       {
         ...pullRequestFixture,
+        changedFileCount: 1,
         files: [{ path: 'image.png', status: 'modified', additions: 0, deletions: 0 }],
       },
       provider,

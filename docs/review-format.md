@@ -2,7 +2,7 @@
 
 The CLI emits a structured report with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. The report includes statistics such as files changed, files ignored by configuration, and review batches. The GitHub Action places the same report in the Actions job summary.
 
-By default the report is rendered as Markdown. `--output-format json` emits the same `ReviewReportData` shape as deterministic JSON for CI integration and downstream tooling. The JSON contains `pullRequest`, `result` (with `summary`, `riskLevel`, and `findings`), `skippedFiles`, and the same count fields as the Markdown statistics block. Findings with `riskLevel: unknown` mean no review was performed (no reviewable patches or all findings filtered out).
+By default the report is rendered as Markdown. `--output-format json` emits the same `ReviewReportData` shape as deterministic JSON for CI integration and downstream tooling. The JSON contains `pullRequest`, `result` (with `summary`, `riskLevel`, and `findings`), `skippedFiles`, and the same count fields as the Markdown statistics block. `fileListStatus` is `complete` or `incomplete`, while `truncatedFileCount` records changed files that GitHub did not return. Findings with `riskLevel: unknown` mean no review was performed (no reviewable patches or all findings filtered out).
 
 ## Severity
 
@@ -27,3 +27,5 @@ Each finding includes a title, file, optional line, evidence-based explanation, 
 ## Interpretation
 
 Read findings as maintainer leads for further investigation. The model sees the pull request metadata, trusted-base repository guidance, and reviewable patches only. Missing context, truncated patches, generated files, binary files, deleted files, ignored files, and oversized content can limit accuracy. Automated output does not replace human review, testing, or a security audit.
+
+GitHub returns at most 3,000 files from the pull-request files endpoint. The reviewer compares that response with GitHub's authoritative changed-file count. If files are unavailable, the report continues but displays a prominent incomplete-review warning and a separate unavailable-file count. Unavailable files are not represented as ordinary skipped files, and the tool does not imply that pagination recovered them.

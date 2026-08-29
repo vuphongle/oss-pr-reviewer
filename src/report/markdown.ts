@@ -11,6 +11,10 @@ export function renderMarkdown(data: ReviewReportData): string {
     skippedFiles.length === 0
       ? '- None'
       : skippedFiles.map((file) => `- \`${file.path}\`: ${file.reason}`).join('\n');
+  const completenessWarning =
+    data.fileListStatus === 'incomplete'
+      ? `\n> [!WARNING]\n> GitHub returned ${pullRequest.files.length} of ${data.changedFileCount} changed files. This review is incomplete: ${data.truncatedFileCount} files were unavailable and are not included in the skipped-files list.\n`
+      : '';
 
   return `# PR Review Report
 
@@ -20,6 +24,8 @@ export function renderMarkdown(data: ReviewReportData): string {
 - PR: #${pullRequest.number}
 - Title: ${pullRequest.title}
 - Risk: ${capitalize(result.riskLevel)}
+- File list: ${capitalize(data.fileListStatus)}
+${completenessWarning}
 
 ## Summary
 
@@ -33,6 +39,7 @@ ${findings}
 
 - Files reviewed: ${data.reviewedFileCount}
 - Files changed: ${data.changedFileCount}
+- Files unavailable: ${data.truncatedFileCount}
 - Files ignored: ${data.ignoredFileCount}
 - Files skipped: ${skippedFiles.length}
 - Review batches: ${data.batchCount}

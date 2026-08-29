@@ -16,6 +16,7 @@ Pull request review often starts with the same context-gathering work: finding t
 
 - Review by `--repo owner/repository --pr 123` or a GitHub pull request URL.
 - Fetch pull request metadata and changed files with Octokit.
+- Detect truncated GitHub file lists and mark the report explicitly incomplete.
 - Skip binary, patchless, and oversized files with reasons in the report.
 - Batch large text diffs with fixed limits: 60,000 characters, 30,000 characters per file, and 8 files per batch.
 - Limit provider calls to four concurrent review batches and preserve result ordering.
@@ -189,7 +190,8 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 
 - Only OpenAI is implemented as a provider.
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
-- GitHub-truncated, missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
+- GitHub returns at most 3,000 pull-request files. When its changed-file count is larger than the returned list, the report continues with an explicit incomplete status, warning, and unavailable-file count.
+- Missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
 - The GitHub Action does not create annotations or enforce a merge policy. Comment mode is bounded and advisory; the CLI does not clone repositories or run tests.
 - Live API usage requires network access and valid credentials; automated tests use mocks.
