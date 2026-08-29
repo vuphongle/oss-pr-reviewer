@@ -1,6 +1,12 @@
 import type { ReviewFinding, Severity } from '../types.js';
 
-export const severityOrder: Record<Severity, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+export const severityOrder: Record<Severity, number> = {
+  unknown: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  critical: 4,
+};
 
 export function filterFindings(findings: ReviewFinding[], minimum: Severity): ReviewFinding[] {
   return findings.filter((finding) => severityOrder[finding.severity] >= severityOrder[minimum]);

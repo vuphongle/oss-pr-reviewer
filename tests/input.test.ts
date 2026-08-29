@@ -5,6 +5,8 @@ import { URL } from 'node:url';
 
 import { parsePullRequestUrl, parseRepository } from '../src/github/types.js';
 import { executeReview } from '../src/cli/commands/review.js';
+import type { ReviewProvider } from '../src/ai/provider.js';
+import { pullRequestFixture, resultFixture } from './fixtures.js';
 
 describe('CLI input parsing', () => {
   it('keeps the CLI version aligned with release metadata', async () => {
@@ -45,6 +47,45 @@ describe('CLI input parsing', () => {
       ).rejects.toThrow(/OPENAI_API_KEY is required/);
     } finally {
       if (previousKey) process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+});
+
+describe('CLI output format', () => {
+  it('renders Markdown by default and JSON when output-format=json is set', async () => {
+    const previousKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = 'test-key';
+    const github = {
+      getPullRequest: async () => pullRequestFixture,
+      getFileAtRef: async () => undefined,
+    };
+    const provider: ReviewProvider = { review: async () => resultFixture() };
+    try {
+      const markdown = await executeReview(
+        {
+          repo: 'example/project',
+          pr: '12',
+          outputFormat: 'markdown',
+          github: github as never,
+          provider,
+        },
+      );
+      expect(markdown).toContain('# PR Review Report');
+
+      const json = await executeReview(
+        {
+          repo: 'example/project',
+          pr: '12',
+          outputFormat: 'json',
+          github: github as never,
+          provider,
+        },
+      );
+      expect(() => JSON.parse(json)).not.toThrow();
+      expect(JSON.parse(json).pullRequest.number).toBe(12);
+    } finally {
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
     }
   });
 });

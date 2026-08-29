@@ -14,6 +14,17 @@ describe('review response schema', () => {
     expect(() => parseReviewResult({ ...resultFixture(), riskLevel: 'urgent' })).toThrow(
       /schema validation/,
     ));
+  it('rejects unknown as a finding severity', () =>
+    expect(() =>
+      parseReviewResult({
+        ...resultFixture(),
+        findings: [{ ...resultFixture().findings[0], severity: 'unknown' }],
+      }),
+    ).toThrow(/schema validation/));
+  it('accepts unknown as a valid risk level for empty reviews', () =>
+    expect(
+      parseReviewResult({ ...resultFixture(), riskLevel: 'unknown', findings: [] }),
+    ).toMatchObject({ riskLevel: 'unknown' }));
   it('rejects whitespace-only text fields', () =>
     expect(() =>
       parseReviewResult({

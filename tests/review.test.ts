@@ -10,7 +10,7 @@ import { DEFAULT_REPOSITORY_CONFIG } from '../src/config/repository.js';
 
 describe('severity and findings', () => {
   it('orders severities deterministically', () =>
-    expect(severityOrder).toEqual({ low: 0, medium: 1, high: 2, critical: 3 }));
+    expect(severityOrder).toEqual({ unknown: 0, low: 1, medium: 2, high: 3, critical: 4 }));
   it('filters findings at the requested minimum', () =>
     expect(
       filterFindings(
@@ -100,6 +100,47 @@ describe('review pipeline', () => {
     expect(execution.reviewedFileCount).toBe(0);
     expect(execution.changedFileCount).toBe(1);
     expect(execution.batchCount).toBe(0);
+  });
+
+  it('reports unknown risk when no patches were available for AI review', async () => {
+    const provider: ReviewProvider = { review: async () => resultFixture() };
+    const execution = await reviewPullRequest(
+      {
+        ...pullRequestFixture,
+        files: [{ path: 'image.png', status: 'modified', additions: 0, deletions: 0 }],
+      },
+      provider,
+    );
+    expect(execution.result.riskLevel).toBe('unknown');
+  });
+
+  it('derives risk from filtered findings, not raw provider output', async () => {
+    const provider: ReviewProvider = {
+      review: async () =>
+        resultFixture({
+          riskLevel: 'critical',
+          findings: [findingFixture({ severity: 'low' })],
+        }),
+    };
+    const execution = await reviewPullRequest(pullRequestFixture, provider, 'high');
+    expect(execution.result.findings).toEqual([]);
+    expect(execution.result.riskLevel).toBe('unknown');
+  });
+
+  it('keeps the highest risk from findings that pass the severity filter', async () => {
+    const provider: ReviewProvider = {
+      review: async () =>
+        resultFixture({
+          riskLevel: 'low',
+          findings: [
+            findingFixture({ severity: 'low', title: 'Style' }),
+            findingFixture({ severity: 'critical', title: 'Critical' }),
+          ],
+        }),
+    };
+    const execution = await reviewPullRequest(pullRequestFixture, provider, 'medium');
+    expect(execution.result.findings).toHaveLength(1);
+    expect(execution.result.riskLevel).toBe('critical');
   });
 
   it('passes repository rules to the provider and reports ignored files', async () => {

@@ -2,42 +2,51 @@ import { writeFile } from 'node:fs/promises';
 
 import { requireOpenAiKey, loadConfig } from '../../config/index.js';
 import { OpenAiReviewProvider } from '../../ai/client.js';
+import type { ReviewProvider } from '../../ai/provider.js';
 import { GithubClient } from '../../github/client.js';
+import type { RepositoryFileReader } from '../../config/repository.js';
 import { parsePullRequestUrl, parseRepository } from '../../github/types.js';
 import { renderMarkdown } from '../../report/markdown.js';
+import { renderJson } from '../../report/json.js';
 import { reviewPullRequest } from '../../review/reviewer.js';
 import type { Severity } from '../../types.js';
 import type { RepositoryConfig } from '../../config/repository.js';
 import { getConfiguredMinimumSeverity, loadRepositoryConfig } from '../../config/repository.js';
+
+export type ReportFormat = 'markdown' | 'json';
 
 export interface ReviewCommandOptions {
   repo?: string;
   pr?: string;
   url?: string;
   output?: string;
+  outputFormat?: ReportFormat;
   model?: string;
   minSeverity?: Severity;
+  github?: Pick<GithubClient, 'getPullRequest'> & RepositoryFileReader;
+  provider?: ReviewProvider;
 }
 
 export async function executeReview(options: ReviewCommandOptions): Promise<string> {
   const input = resolveInput(options);
   const config = loadConfig();
   const openAiApiKey = requireOpenAiKey(config);
-  const github = new GithubClient({ token: config.githubToken });
+  const github = options.github ?? new GithubClient({ token: config.githubToken });
   const pullRequest = await github.getPullRequest(input.repository, input.number);
   const repositoryConfig = await loadRepositoryConfig(github, {
     owner: pullRequest.owner,
     repository: pullRequest.repository,
     ref: pullRequest.baseSha,
   });
-  const provider = new OpenAiReviewProvider(openAiApiKey, options.model);
+  const provider =
+    options.provider ?? new OpenAiReviewProvider(openAiApiKey, options.model);
   const execution = await reviewPullRequest(
     pullRequest,
     provider,
     resolveMinimumSeverity(options.minSeverity, repositoryConfig),
     repositoryConfig,
   );
-  const report = renderMarkdown({ pullRequest, ...execution });
+  const report = renderReport({ pullRequest, ...execution }, options.outputFormat ?? 'markdown');
 
   if (options.output) {
     try {
@@ -50,6 +59,13 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
   }
 
   return report;
+}
+
+export function renderReport(
+  data: Parameters<typeof renderMarkdown>[0],
+  format: ReportFormat,
+): string {
+  return format === 'json' ? renderJson(data) : renderMarkdown(data);
 }
 
 export function resolveMinimumSeverity(
