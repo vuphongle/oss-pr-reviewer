@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 
 import type { PullRequest, ReviewResult } from '../types.js';
 import type { ReviewBatch } from '../review/batching.js';
+import type { ReviewBudget } from '../review/batching.js';
 import { buildReviewPrompt, REVIEW_SYSTEM_PROMPT } from '../review/prompt.js';
 import { parseJsonReviewResponse } from '../review/schema.js';
 import type { ReviewProvider } from './provider.js';
@@ -35,12 +36,18 @@ export class OpenAiReviewProvider implements ReviewProvider {
     pullRequest: PullRequest;
     batch: ReviewBatch;
     reviewRules?: import('../config/repository.js').ReviewRule[];
+    reviewBudget?: ReviewBudget;
   }): Promise<ReviewResult> {
     const messages = [
       { role: 'system' as const, content: REVIEW_SYSTEM_PROMPT },
       {
         role: 'user' as const,
-        content: buildReviewPrompt(input.pullRequest, input.batch, input.reviewRules),
+        content: buildReviewPrompt(
+          input.pullRequest,
+          input.batch,
+          input.reviewRules,
+          input.reviewBudget,
+        ),
       },
     ];
 

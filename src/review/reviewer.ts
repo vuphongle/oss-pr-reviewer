@@ -35,9 +35,10 @@ export async function reviewPullRequest(
     pullRequest.changedFileCount === pullRequest.files.length ? 'complete' : 'incomplete';
   const ignored = filterIgnoredFiles(pullRequest.files, repositoryConfig.ignore.paths);
   const normalized = normalizeFiles(ignored.files);
+  const reviewBudget = getConfiguredReviewBudget(repositoryConfig, DEFAULT_REVIEW_BUDGET);
   const batched = createBatches(
     normalized.reviewable,
-    getConfiguredReviewBudget(repositoryConfig, DEFAULT_REVIEW_BUDGET),
+    reviewBudget,
   );
   const skippedFiles = [...ignored.skipped, ...normalized.skipped, ...batched.skipped];
 
@@ -63,6 +64,7 @@ export async function reviewPullRequest(
     provider,
     pullRequest,
     repositoryConfig.rules,
+    reviewBudget,
   );
   const findings = filterFindings(
     deduplicateFindings(results.flatMap((result) => result.findings)),
@@ -100,6 +102,7 @@ async function reviewBatches(
   provider: ReviewProvider,
   pullRequest: PullRequest,
   reviewRules: RepositoryConfig['rules'],
+  reviewBudget: ReturnType<typeof getConfiguredReviewBudget>,
 ): Promise<ReviewResult[]> {
   const results = new Array<ReviewResult>(batches.length);
   let nextIndex = 0;
@@ -116,6 +119,7 @@ async function reviewBatches(
           pullRequest,
           batch: batches[index],
           reviewRules,
+          reviewBudget,
         });
       } catch (error) {
         failed = true;

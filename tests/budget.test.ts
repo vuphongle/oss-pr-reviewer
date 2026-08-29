@@ -26,6 +26,9 @@ describe('review context budgeting', () => {
       maxFilesPerBatch: 8,
       reservedPromptCharacters: 8_000,
       reservedResponseCharacters: 12_000,
+      maxPromptCharacters: 120_000,
+      maxMetadataCharacters: 20_000,
+      maxGuidanceCharacters: 24_000,
     });
     expect(getUsableDiffCharacters(DEFAULT_REVIEW_BUDGET)).toBe(40_000);
   });

@@ -6,6 +6,9 @@ import type { Severity } from '../types.js';
 import type { RepositoryReference } from '../github/types.js';
 import type { ReviewBudget } from '../review/batching.js';
 
+export const MAX_RULE_DESCRIPTION_CHARACTERS = 4_000;
+export const MAX_TOTAL_RULE_CHARACTERS = 20_000;
+
 const repositoryConfigSchema = z
   .object({
     version: z.literal(1),
@@ -20,10 +23,26 @@ const repositoryConfigSchema = z
           id: z
             .string()
             .trim()
+            .max(128)
             .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-          description: z.string().trim().min(1),
+          description: z.string().trim().min(1).max(MAX_RULE_DESCRIPTION_CHARACTERS),
         }),
       )
+      .max(100)
+      .superRefine((rules, context) => {
+        const totalCharacters =
+          rules.reduce((total, rule) => total + `RULE ${rule.id}: ${rule.description}`.length, 0) +
+          Math.max(0, rules.length - 1);
+        if (totalCharacters > MAX_TOTAL_RULE_CHARACTERS) {
+          context.addIssue({
+            code: z.ZodIssueCode.too_big,
+            maximum: MAX_TOTAL_RULE_CHARACTERS,
+            type: 'string',
+            inclusive: true,
+            message: `combined rendered rule guidance must be at most ${MAX_TOTAL_RULE_CHARACTERS} characters`,
+          });
+        }
+      })
       .default([]),
     ignore: z
       .object({
@@ -39,6 +58,9 @@ const repositoryConfigSchema = z
         maxFileCharacters: z.number().int().positive().max(200_000).optional(),
         reservedPromptCharacters: z.number().int().nonnegative().max(100_000).optional(),
         reservedResponseCharacters: z.number().int().nonnegative().max(100_000).optional(),
+        maxPromptCharacters: z.number().int().positive().max(500_000).optional(),
+        maxMetadataCharacters: z.number().int().positive().max(100_000).optional(),
+        maxGuidanceCharacters: z.number().int().positive().max(100_000).optional(),
       })
       .default({}),
   })

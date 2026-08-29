@@ -36,6 +36,19 @@ describe('repository configuration', () => {
     expect(() => parseRepositoryConfig('version: 1\nignore:\n  paths: [123]')).toThrow(/paths/);
   });
 
+  it('rejects oversized individual and aggregate rule guidance', () => {
+    expect(() =>
+      parseRepositoryConfig(
+        `version: 1\nrules:\n  - id: too-long\n    description: ${'x'.repeat(4_001)}`,
+      ),
+    ).toThrow(/rules/);
+    expect(() =>
+      parseRepositoryConfig(
+        `version: 1\nrules:\n${Array.from({ length: 6 }, (_, index) => `  - id: rule-${index}\n    description: ${'x'.repeat(4_000)}`).join('\n')}`,
+      ),
+    ).toThrow(/combined rendered rule guidance/);
+  });
+
   it('uses defaults when the trusted base branch has no config file', async () => {
     const reader = { getFileAtRef: vi.fn().mockResolvedValue(undefined) };
     await expect(
@@ -85,5 +98,16 @@ describe('repository configuration', () => {
       'version: 1\ncontext:\n  maxFilesPerBatch: 10\n  reservedResponseCharacters: 15000',
     );
     expect(config.context).toEqual({ maxFilesPerBatch: 10, reservedResponseCharacters: 15000 });
+  });
+
+  it('validates total prompt and separate metadata/guidance caps', () => {
+    const config = parseRepositoryConfig(
+      'version: 1\ncontext:\n  maxPromptCharacters: 90000\n  maxMetadataCharacters: 12000\n  maxGuidanceCharacters: 16000',
+    );
+    expect(config.context).toEqual({
+      maxPromptCharacters: 90000,
+      maxMetadataCharacters: 12000,
+      maxGuidanceCharacters: 16000,
+    });
   });
 });
