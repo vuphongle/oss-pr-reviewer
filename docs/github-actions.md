@@ -29,6 +29,8 @@ jobs:
 
 The example uses the tagged release rather than `main`. Pin the Action to a reviewed release or commit according to your repository's dependency policy.
 
+The examples use a per-repository, per-pull-request concurrency group with `cancel-in-progress: true`, so a newer push cancels an older queued or running review where GitHub can cancel it. The publisher also re-reads the current PR head immediately before creating or updating a comment and skips publication when the reviewed head SHA is stale. This is best-effort protection: GitHub's comment-create API has no compare-and-swap or idempotency key, so already-running concurrent creations cannot receive a strict duplicate guarantee.
+
 ## Choose an Output Mode
 
 Summary-only mode is the default and needs only read permissions:
@@ -54,7 +56,7 @@ steps:
       post-comment: true
 ```
 
-`post-comment` accepts only `true` or `false` and defaults to `false`. Comment mode creates one tool-owned comment on the first run and updates it on later `synchronize` runs. It uses the invisible marker `<!-- oss-pr-reviewer -->`, only targets expected bot-authored comments, and does not delete older duplicates.
+`post-comment` accepts only `true` or `false` and defaults to `false`. Comment mode creates one tool-owned comment on the first run and updates it on later `synchronize` runs. It uses the invisible marker `<!-- oss-pr-reviewer -->`, only targets expected bot-authored comments, includes the reviewed head SHA in the report, skips stale publications, and does not delete older duplicates.
 
 ## Inputs
 

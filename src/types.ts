@@ -18,6 +18,7 @@ export interface PullRequest {
   title: string;
   body: string;
   baseSha: string;
+  headSha: string;
   changedFileCount: number;
   files: ChangedFile[];
 }

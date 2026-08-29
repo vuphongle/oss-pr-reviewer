@@ -29,7 +29,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
 - Reserve predictable prompt/response space with simple character-based context budget settings.
-- Run an opt-in GitHub Action that appends a bounded advisory report to the Actions job summary.
+- Run an opt-in GitHub Action that appends a bounded advisory report to the Actions job summary and publishes stale-safe comments.
 
 ## How It Works
 
@@ -110,7 +110,7 @@ The file is loaded from the pull request's base commit, not the PR branch, so a 
 
 ## GitHub Actions
 
-v0.4.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and always appends the Markdown report to the job summary. With `post-comment: true`, it also creates or updates one owned PR comment without posting duplicates.
+v0.4.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and always appends the Markdown report to the job summary. The documented workflows cancel older runs per pull request. With `post-comment: true`, it also creates or updates one owned PR comment, includes the reviewed head SHA, and skips publication when the current head has changed.
 
 ```yaml
 name: AI PR Review
@@ -194,6 +194,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 - Missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
 - Context budgeting uses character approximations rather than exact model tokenization.
 - The GitHub Action does not create annotations or enforce a merge policy. Comment mode is bounded and advisory; the CLI does not clone repositories or run tests.
+- Comment publication is best-effort under concurrent runs: workflow cancellation and a current-head check reduce duplicates/stale overwrites, but GitHub comment creation has no atomic idempotency guarantee.
 - Live API usage requires network access and valid credentials; automated tests use mocks.
 
 ## Development and Testing
