@@ -6,7 +6,15 @@ export interface ReviewBudget {
   maxFilesPerBatch: number;
   reservedPromptCharacters: number;
   reservedResponseCharacters: number;
+  maxPromptCharacters?: number;
+  maxMetadataCharacters?: number;
+  maxGuidanceCharacters?: number;
 }
+
+export const DEFAULT_MAX_PROMPT_CHARACTERS = 120_000;
+export const DEFAULT_MAX_METADATA_CHARACTERS = 20_000;
+export const DEFAULT_MAX_GUIDANCE_CHARACTERS = 24_000;
+export const SYSTEM_PROMPT_CHARACTER_RESERVE = 2_000;
 
 export const DEFAULT_REVIEW_BUDGET: ReviewBudget = {
   maxDiffCharacters: 60_000,
@@ -14,6 +22,9 @@ export const DEFAULT_REVIEW_BUDGET: ReviewBudget = {
   maxFilesPerBatch: 8,
   reservedPromptCharacters: 8_000,
   reservedResponseCharacters: 12_000,
+  maxPromptCharacters: DEFAULT_MAX_PROMPT_CHARACTERS,
+  maxMetadataCharacters: DEFAULT_MAX_METADATA_CHARACTERS,
+  maxGuidanceCharacters: DEFAULT_MAX_GUIDANCE_CHARACTERS,
 } as const;
 
 export const REVIEW_LIMITS = {
@@ -38,8 +49,15 @@ export function budgetFromLegacyLimits(limits: typeof REVIEW_LIMITS): ReviewBudg
 }
 
 export function getUsableDiffCharacters(budget: ReviewBudget): number {
-  const usable =
+  const diffBudget =
     budget.maxDiffCharacters - budget.reservedPromptCharacters - budget.reservedResponseCharacters;
+  const promptBudget =
+    (budget.maxPromptCharacters ?? DEFAULT_MAX_PROMPT_CHARACTERS) -
+    SYSTEM_PROMPT_CHARACTER_RESERVE -
+    (budget.maxMetadataCharacters ?? DEFAULT_MAX_METADATA_CHARACTERS) -
+    (budget.maxGuidanceCharacters ?? DEFAULT_MAX_GUIDANCE_CHARACTERS) -
+    budget.reservedResponseCharacters;
+  const usable = Math.min(diffBudget, promptBudget);
   if (usable <= 0) throw new Error('Review budget must reserve less context than its maximum.');
   return usable;
 }

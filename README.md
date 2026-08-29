@@ -29,6 +29,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
 - Reserve predictable prompt/response space with simple character-based context budget settings.
+- Bound total prompt context, truncate oversized PR metadata with a note, and reject oversized repository guidance.
 - Run an opt-in GitHub Action that appends a bounded advisory report to the Actions job summary and publishes stale-safe comments.
 
 ## How It Works
@@ -192,7 +193,7 @@ Keep tokens in the environment, use authenticated GitHub access where possible, 
 - The tool reviews supplied pull request metadata and patches rather than the full repository.
 - GitHub returns at most 3,000 pull-request files. When its changed-file count is larger than the returned list, the report continues with an explicit incomplete status, warning, and unavailable-file count.
 - Missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
-- Context budgeting uses character approximations rather than exact model tokenization.
+- Context budgeting uses character approximations rather than exact model tokenization. The total cap includes the system prompt, PR metadata, repository guidance, diff, and reserved response space; metadata is explicitly truncated and oversized rules are rejected.
 - The GitHub Action does not create annotations or enforce a merge policy. Comment mode is bounded and advisory; the CLI does not clone repositories or run tests.
 - Comment publication is best-effort under concurrent runs: workflow cancellation and a current-head check reduce duplicates/stale overwrites, but GitHub comment creation has no atomic idempotency guarantee.
 - Live API usage requires network access and valid credentials; automated tests use mocks.
