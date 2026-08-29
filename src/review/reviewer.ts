@@ -2,6 +2,7 @@ import type { PullRequest, ReviewResult, Severity, SkippedFile } from '../types.
 import type { RepositoryConfig } from '../config/repository.js';
 import { DEFAULT_REPOSITORY_CONFIG, getConfiguredReviewBudget } from '../config/repository.js';
 import { createBatches, DEFAULT_REVIEW_BUDGET } from './batching.js';
+import type { ReviewBatch } from './batching.js';
 import { filterIgnoredFiles } from './ignore.js';
 import { normalizeFiles } from './normalize.js';
 import { deduplicateFindings, filterFindings, severityOrder } from './severity.js';
@@ -15,6 +16,8 @@ export interface ReviewExecution {
   ignoredFileCount: number;
   batchCount: number;
 }
+
+export const DEFAULT_REVIEW_CONCURRENCY = 4;
 
 export async function reviewPullRequest(
   pullRequest: PullRequest,
@@ -45,10 +48,11 @@ export async function reviewPullRequest(
     };
   }
 
-  const results = await Promise.all(
-    batched.batches.map((batch) =>
-      provider.review({ pullRequest, batch, reviewRules: repositoryConfig.rules }),
-    ),
+  const results = await reviewBatches(
+    batched.batches,
+    provider,
+    pullRequest,
+    repositoryConfig.rules,
   );
   const findings = filterFindings(
     deduplicateFindings(results.flatMap((result) => result.findings)),
@@ -77,4 +81,40 @@ export async function reviewPullRequest(
     ignoredFileCount: ignored.skipped.length,
     batchCount: batched.batches.length,
   };
+}
+
+async function reviewBatches(
+  batches: ReviewBatch[],
+  provider: ReviewProvider,
+  pullRequest: PullRequest,
+  reviewRules: RepositoryConfig['rules'],
+): Promise<ReviewResult[]> {
+  const results = new Array<ReviewResult>(batches.length);
+  let nextIndex = 0;
+  let failed = false;
+  let firstError: unknown;
+
+  const worker = async (): Promise<void> => {
+    while (!failed) {
+      const index = nextIndex++;
+      if (index >= batches.length) return;
+
+      try {
+        results[index] = await provider.review({
+          pullRequest,
+          batch: batches[index],
+          reviewRules,
+        });
+      } catch (error) {
+        failed = true;
+        firstError = error;
+        return;
+      }
+    }
+  };
+
+  const workerCount = Math.min(DEFAULT_REVIEW_CONCURRENCY, batches.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  if (failed) throw firstError;
+  return results;
 }

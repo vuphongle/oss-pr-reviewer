@@ -18,6 +18,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Fetch pull request metadata and changed files with Octokit.
 - Skip binary, patchless, and oversized files with reasons in the report.
 - Batch large text diffs with fixed limits: 60,000 characters, 30,000 characters per file, and 8 files per batch.
+- Limit provider calls to four concurrent review batches and preserve result ordering.
 - Validate OpenAI JSON responses with Zod.
 - Deduplicate identical findings and apply deterministic severity filtering.
 - Print Markdown to stdout or write it to `--output`.

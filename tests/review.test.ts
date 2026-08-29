@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createBatches, REVIEW_LIMITS } from '../src/review/batching.js';
 import { normalizeFiles } from '../src/review/normalize.js';
-import { reviewPullRequest } from '../src/review/reviewer.js';
+import { DEFAULT_REVIEW_CONCURRENCY, reviewPullRequest } from '../src/review/reviewer.js';
 import { deduplicateFindings, filterFindings, severityOrder } from '../src/review/severity.js';
 import { findingFixture, pullRequestFixture, resultFixture } from './fixtures.js';
 import type { ReviewProvider } from '../src/ai/provider.js';
@@ -177,5 +177,86 @@ describe('review pipeline', () => {
         reviewRules: [{ id: 'require-tests', description: 'Changes to source need tests.' }],
       }),
     );
+  });
+
+  it('limits concurrent provider calls and preserves batch order', async () => {
+    const files = Array.from({ length: 10 }, (_, index) => ({
+      path: `batch-${index}.ts`,
+      status: 'modified',
+      additions: 1,
+      deletions: 0,
+      patch: 'x',
+    }));
+    let active = 0;
+    let maxActive = 0;
+    const provider: ReviewProvider = {
+      review: async ({ batch }) => {
+        const index = Number(batch.files[0]?.path.match(/batch-(\d+)/)?.[1]);
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 10 - index));
+        active -= 1;
+        return resultFixture({ summary: `batch ${index}`, findings: [] });
+      },
+    };
+    const execution = await reviewPullRequest(
+      { ...pullRequestFixture, files },
+      provider,
+      'low',
+      {
+        ...DEFAULT_REPOSITORY_CONFIG,
+        context: {
+          maxFilesPerBatch: 1,
+          maxDiffCharacters: 10,
+          maxFileCharacters: 10,
+          reservedPromptCharacters: 0,
+          reservedResponseCharacters: 0,
+        },
+      },
+    );
+
+    expect(maxActive).toBeLessThanOrEqual(DEFAULT_REVIEW_CONCURRENCY);
+    expect(execution.result.summary).toBe(
+      'batch 0 batch 1 batch 2 batch 3 batch 4 batch 5 batch 6 batch 7 batch 8 batch 9',
+    );
+  });
+
+  it('stops scheduling new batches after the first provider failure', async () => {
+    const files = Array.from({ length: 10 }, (_, index) => ({
+      path: `batch-${index}.ts`,
+      status: 'modified',
+      additions: 1,
+      deletions: 0,
+      patch: 'x',
+    }));
+    const calls: number[] = [];
+    const provider: ReviewProvider = {
+      review: async ({ batch }) => {
+        const index = Number(batch.files[0]?.path.match(/batch-(\d+)/)?.[1]);
+        calls.push(index);
+        if (index === 1) throw new Error('provider failed');
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 20));
+        return resultFixture({ findings: [] });
+      },
+    };
+
+    await expect(
+      reviewPullRequest(
+        { ...pullRequestFixture, files },
+        provider,
+        'low',
+        {
+          ...DEFAULT_REPOSITORY_CONFIG,
+          context: {
+            maxFilesPerBatch: 1,
+            maxDiffCharacters: 10,
+            maxFileCharacters: 10,
+            reservedPromptCharacters: 0,
+            reservedResponseCharacters: 0,
+          },
+        },
+      ),
+    ).rejects.toThrow('provider failed');
+    expect(calls.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });
 });
