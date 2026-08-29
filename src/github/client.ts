@@ -57,6 +57,7 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
         title: pullResponse.data.title,
         body: pullResponse.data.body ?? '',
         baseSha: pullResponse.data.base.sha,
+        headSha: pullResponse.data.head.sha,
         changedFileCount: pullResponse.data.changed_files,
         files: filesResponse.map((file) => ({
           path: file.filename,
@@ -67,6 +68,19 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
           previousPath: file.previous_filename,
         })),
       };
+    } catch (error) {
+      throw normalizeGithubError(error);
+    }
+  }
+
+  async getPullRequestHeadSha(reference: RepositoryReference, number: number): Promise<string> {
+    try {
+      const response = await this.octokit.pulls.get({
+        owner: reference.owner,
+        repo: reference.repository,
+        pull_number: number,
+      });
+      return response.data.head.sha;
     } catch (error) {
       throw normalizeGithubError(error);
     }

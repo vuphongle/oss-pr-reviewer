@@ -100,12 +100,14 @@ describe('GitHub pull request event', () => {
         pull_request: {
           number: 12,
           html_url: 'https://github.com/octo/project/pull/12',
+          head: { sha: 'head-sha' },
         },
       }),
     ).toEqual({
       url: 'https://github.com/octo/project/pull/12',
       number: 12,
       isFork: false,
+      headSha: 'head-sha',
     });
   });
 
@@ -117,7 +119,7 @@ describe('GitHub pull request event', () => {
           number: 12,
           html_url: 'https://github.com/octo/project/pull/12',
           base: { repo: { full_name: 'octo/project' } },
-          head: { repo: { full_name: 'contributor/project' } },
+          head: { repo: { full_name: 'contributor/project' }, sha: 'head-sha' },
         },
       }).isFork,
     ).toBe(true);
@@ -131,7 +133,7 @@ describe('GitHub pull request event', () => {
           number: 12,
           html_url: 'https://github.com/octo/project/pull/12',
           base: { repo: { full_name: 'octo/project' } },
-          head: { repo: { full_name: 'octo/project' } },
+          head: { repo: { full_name: 'octo/project' }, sha: 'head-sha' },
         },
       }).isFork,
     ).toBe(false);
@@ -140,7 +142,12 @@ describe('GitHub pull request event', () => {
   it('explains why fork workflows cannot review without an OpenAI secret', () => {
     expect(() =>
       assertActionCredentialsAvailable(
-        { url: 'https://github.com/octo/project/pull/12', number: 12, isFork: true },
+        {
+          url: 'https://github.com/octo/project/pull/12',
+          number: 12,
+          isFork: true,
+          headSha: 'head-sha',
+        },
         {},
       ),
     ).toThrow(/does not expose repository secrets to pull_request workflows from forks/);
@@ -174,6 +181,9 @@ describe('GitHub Action security documentation', () => {
     expect(workflow).toMatch(/pull_request:/);
     expect(workflow).toMatch(/contents: read/);
     expect(workflow).toMatch(/pull-requests: read/);
+    expect(workflow).toMatch(/concurrency:/);
+    expect(workflow).toMatch(/cancel-in-progress: true/);
+    expect(workflow).toMatch(/github\.event\.pull_request\.number/);
     expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.4\.0/);
     expect(workflow).not.toMatch(/pull_request_target/);
   });
@@ -186,6 +196,8 @@ describe('GitHub Action security documentation', () => {
     expect(workflow).toMatch(/pull_request:/);
     expect(workflow).toMatch(/pull-requests: write/);
     expect(workflow).toMatch(/post-comment: true/);
+    expect(workflow).toMatch(/concurrency:/);
+    expect(workflow).toMatch(/cancel-in-progress: true/);
     expect(workflow).toMatch(/vuphongle\/oss-pr-reviewer@v0\.4\.0/);
     expect(workflow).not.toMatch(/pull_request_target/);
   });
@@ -289,7 +301,12 @@ describe('GitHub Action report output', () => {
     await expect(
       publishActionComment(
         client as never,
-        { url: 'https://github.com/octo/project/pull/7', number: 7, isFork: false },
+        {
+          url: 'https://github.com/octo/project/pull/7',
+          number: 7,
+          isFork: false,
+          headSha: 'head-sha',
+        },
         '## Review',
         false,
       ),
@@ -301,11 +318,17 @@ describe('GitHub Action report output', () => {
     const client = {
       listComments: vi.fn().mockResolvedValue([]),
       createComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
+      getPullRequestHeadSha: vi.fn().mockResolvedValue('head-sha'),
     };
     await expect(
       publishActionComment(
         client as never,
-        { url: 'https://github.com/octo/project/pull/7', number: 7, isFork: false },
+        {
+          url: 'https://github.com/octo/project/pull/7',
+          number: 7,
+          isFork: false,
+          headSha: 'head-sha',
+        },
         '## Review',
         true,
       ),

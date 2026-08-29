@@ -38,9 +38,10 @@ describe('PR comment publishing', () => {
       listComments: vi.fn().mockResolvedValue([]),
       createComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
       updateComment: vi.fn(),
+      getPullRequestHeadSha: vi.fn().mockResolvedValue('head-sha'),
     };
 
-    await expect(publishReviewComment(client, reference, 7, '## Review')).resolves.toEqual({
+    await expect(publishReviewComment(client, reference, 7, '## Review', 'head-sha')).resolves.toEqual({
       action: 'created',
       id: 22,
       htmlUrl: 'https://example.test/c/22',
@@ -64,14 +65,15 @@ describe('PR comment publishing', () => {
       ]),
       createComment: vi.fn(),
       updateComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
+      getPullRequestHeadSha: vi.fn().mockResolvedValue('head-sha'),
     };
 
-    await expect(publishReviewComment(client, reference, 7, '## Updated')).resolves.toEqual({
+    await expect(publishReviewComment(client, reference, 7, '## Updated', 'head-sha')).resolves.toEqual({
       action: 'updated',
       id: 22,
       htmlUrl: 'https://example.test/c/22',
     });
-    await expect(publishReviewComment(client, reference, 7, '## Updated again')).resolves.toEqual({
+    await expect(publishReviewComment(client, reference, 7, '## Updated again', 'head-sha')).resolves.toEqual({
       action: 'updated',
       id: 22,
       htmlUrl: 'https://example.test/c/22',
@@ -106,14 +108,30 @@ describe('PR comment publishing', () => {
       listComments: vi.fn().mockResolvedValue([]),
       createComment: vi.fn().mockResolvedValue({ id: 22, htmlUrl: 'https://example.test/c/22' }),
       updateComment: vi.fn(),
+      getPullRequestHeadSha: vi.fn().mockResolvedValue('head-sha'),
     };
     const report = `# PR Review Report\n\n### CRITICAL - Security\n${'@maintainer critical '.repeat(4000)}`;
 
-    await publishReviewComment(client, reference, 7, report);
+    await publishReviewComment(client, reference, 7, report, 'head-sha');
 
     const body = client.createComment.mock.calls[0][2] as string;
     expect(body.length).toBeLessThanOrEqual(MAX_REVIEW_COMMENT_CHARACTERS);
     expect(body).toContain('@\u200bmaintainer');
     expect(body).toContain('shortened because the complete review exceeded');
+  });
+
+  it('skips publication when the pull request head changed during review', async () => {
+    const client = {
+      listComments: vi.fn().mockResolvedValue([]),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      getPullRequestHeadSha: vi.fn().mockResolvedValue('new-head'),
+    };
+
+    await expect(
+      publishReviewComment(client, reference, 7, '## Stale review', 'old-head'),
+    ).resolves.toBeUndefined();
+    expect(client.createComment).not.toHaveBeenCalled();
+    expect(client.updateComment).not.toHaveBeenCalled();
   });
 });

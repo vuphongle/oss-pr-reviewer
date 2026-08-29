@@ -51,7 +51,7 @@ Markdown renderer
 - `src/report/` renders the final report without making claims that automated review is definitive.
 - `action.yml` is a thin composite Action. It builds and runs only the trusted Action checkout, parses supported pull request event metadata, and appends the existing Markdown report to the job summary.
 - `src/action/` contains testable Action-boundary code for event parsing, input validation, secret redaction, fork limitations, and summary output. It does not duplicate review logic.
-- `src/github/comments.ts` owns marker-based comment discovery and create/update behavior. `src/github/comment-safety.ts` bounds and sanitizes comment output without changing the full summary report.
+- `src/github/comments.ts` owns marker-based comment discovery and create/update behavior, including a best-effort current-head check immediately before publication. `src/github/comment-safety.ts` bounds and sanitizes comment output without changing the full summary report.
 
 Custom rule descriptions are passed as untrusted user-context guidance. They cannot replace or modify the system review policy.
 

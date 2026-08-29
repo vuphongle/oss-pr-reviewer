@@ -23,6 +23,7 @@ export function renderMarkdown(data: ReviewReportData): string {
 - Repository: ${pullRequest.owner}/${pullRequest.repository}
 - PR: #${pullRequest.number}
 - Title: ${pullRequest.title}
+- Reviewed head: \`${pullRequest.headSha}\`
 - Risk: ${capitalize(result.riskLevel)}
 - File list: ${capitalize(data.fileListStatus)}
 ${completenessWarning}

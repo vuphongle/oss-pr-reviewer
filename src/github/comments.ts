@@ -27,6 +27,10 @@ export interface ReviewCommentClient {
   ): Promise<Pick<ReviewComment, 'id' | 'htmlUrl'>>;
 }
 
+export interface PullRequestHeadClient {
+  getPullRequestHeadSha(reference: RepositoryReference, pullRequestNumber: number): Promise<string>;
+}
+
 export interface PublishedReviewComment {
   action: 'created' | 'updated';
   id: number;
@@ -55,14 +59,17 @@ export async function findReviewComment(
 }
 
 export async function publishReviewComment(
-  client: ReviewCommentClient,
+  client: ReviewCommentClient & PullRequestHeadClient,
   reference: RepositoryReference,
   pullRequestNumber: number,
   report: string,
-): Promise<PublishedReviewComment> {
+  reviewedHeadSha: string,
+): Promise<PublishedReviewComment | undefined> {
   const body = prepareReviewComment(report).body;
   const existing = await findReviewComment(client, reference, pullRequestNumber);
   try {
+    const currentHeadSha = await client.getPullRequestHeadSha(reference, pullRequestNumber);
+    if (currentHeadSha !== reviewedHeadSha) return undefined;
     if (existing) {
       const updated = await client.updateComment(reference, pullRequestNumber, existing.id, body);
       return { action: 'updated', id: updated.id, htmlUrl: updated.htmlUrl };

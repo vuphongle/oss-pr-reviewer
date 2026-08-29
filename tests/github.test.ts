@@ -11,7 +11,13 @@ describe('GitHub client', () => {
     const octokit = {
       pulls: {
         get: vi.fn().mockResolvedValue({
-          data: { title: 'Title', body: null, base: { sha: 'base-sha' }, changed_files: 1 },
+          data: {
+            title: 'Title',
+            body: null,
+            base: { sha: 'base-sha' },
+            head: { sha: 'head-sha' },
+            changed_files: 1,
+          },
         }),
         listFiles: vi.fn(),
       },
@@ -36,6 +42,7 @@ describe('GitHub client', () => {
       number: 4,
       title: 'Title',
       body: '',
+      headSha: 'head-sha',
       changedFileCount: 1,
     });
     expect(pullRequest.files[0]).toMatchObject({ path: 'src/a.ts', patch: '@@', additions: 2 });
@@ -49,6 +56,7 @@ describe('GitHub client', () => {
             title: 'Large change',
             body: '',
             base: { sha: 'base-sha' },
+            head: { sha: 'head-sha' },
             changed_files: 3001,
           },
         }),
@@ -88,6 +96,23 @@ describe('GitHub client', () => {
         new GithubClient({ octokit: octokit as never }).getPullRequest(reference, 4),
       ).rejects.toThrow(message);
     }
+  });
+
+  it('reads the current pull request head SHA for stale publication checks', async () => {
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockResolvedValue({ data: { head: { sha: 'current-head' } } }),
+      },
+    };
+
+    await expect(
+      new GithubClient({ octokit: octokit as never }).getPullRequestHeadSha(reference, 4),
+    ).resolves.toBe('current-head');
+    expect(octokit.pulls.get).toHaveBeenCalledWith({
+      owner: 'octo',
+      repo: 'project',
+      pull_number: 4,
+    });
   });
 
   it('reads and decodes a file from a trusted ref', async () => {
