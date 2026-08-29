@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Buffer } from 'node:buffer';
 
 import {
   buildActionReviewOptions,
@@ -8,6 +9,11 @@ import {
 import { parsePullRequestEvent } from '../src/action/event.js';
 import { writeActionReport } from '../src/action/output.js';
 import { writeActionOutput } from '../src/action/output.js';
+import {
+  boundSummary,
+  DEFAULT_SUMMARY_BUDGET_BYTES,
+  SUMMARY_TRUNCATION_NOTICE,
+} from '../src/action/summary.js';
 import { assertActionCredentialsAvailable } from '../src/action/security.js';
 import { publishActionComment } from '../src/action/comment.js';
 import { OSS_PR_REVIEWER_MARKER } from '../src/github/comments.js';
@@ -204,6 +210,67 @@ describe('GitHub Action report output', () => {
 
     await expect(readFile(reportPath, 'utf8')).resolves.toBe('# Report\n');
     await expect(readFile(summaryPath, 'utf8')).resolves.toBe('# Report\n');
+  });
+
+  it('bounds oversized summaries by UTF-8 bytes and prioritizes severe findings', () => {
+    const report = [
+      '# PR Review Report',
+      '',
+      '## Pull Request',
+      '',
+      '- Title: 漢字',
+      '',
+      '## Findings',
+      '',
+      '### LOW - Bug',
+      '',
+      'low finding '.repeat(30),
+      '',
+      '### CRITICAL - Security',
+      '',
+      'critical finding',
+      '',
+      '## Review Statistics',
+      '',
+      '- Findings: 2',
+    ].join('\n');
+    const summary = boundSummary(report, 300);
+
+    expect(Buffer.byteLength(summary, 'utf8')).toBeLessThanOrEqual(300);
+    expect(summary).toContain('CRITICAL - Security');
+    expect(summary).toContain(SUMMARY_TRUNCATION_NOTICE);
+    expect(Buffer.byteLength(summary, 'utf8')).toBeLessThanOrEqual(DEFAULT_SUMMARY_BUDGET_BYTES);
+  });
+
+  it('retains the report header and critical findings when the summary is oversized', () => {
+    const report = [
+      '# PR Review Report',
+      '',
+      '## Pull Request',
+      '',
+      '- Title: Large summary',
+      '',
+      '## Summary',
+      '',
+      'x'.repeat(5_000),
+      '',
+      '## Findings',
+      '',
+      '### LOW - Bug',
+      '',
+      'low finding',
+      '',
+      '### CRITICAL - Security',
+      '',
+      'critical finding',
+    ].join('\n');
+    const summary = boundSummary(report, 500);
+
+    expect(summary).toContain('# PR Review Report');
+    expect(summary).toContain('## Findings');
+    expect(summary).toContain('CRITICAL - Security');
+    expect(summary).toContain(SUMMARY_TRUNCATION_NOTICE);
+    expect(Buffer.byteLength(summary, 'utf8')).toBeLessThanOrEqual(500);
   });
 
   it('writes stable action outputs using the GitHub output protocol', async () => {
