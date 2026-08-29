@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const severitySchema = z.enum(['unknown', 'low', 'medium', 'high', 'critical']);
+export const severitySchema = z.enum(['low', 'medium', 'high', 'critical']);
+export const riskLevelSchema = z.enum(['unknown', 'low', 'medium', 'high', 'critical']);
 export const categorySchema = z.enum([
   'bug',
   'security',
@@ -23,7 +24,7 @@ export const findingSchema = z.object({
 
 export const reviewResultSchema = z.object({
   summary: z.string().trim().min(1),
-  riskLevel: severitySchema,
+  riskLevel: riskLevelSchema,
   findings: z.array(findingSchema),
 });
 
