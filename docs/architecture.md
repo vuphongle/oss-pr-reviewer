@@ -45,6 +45,7 @@ Markdown renderer
 - `src/review/normalize.ts` removes binary and patchless files from AI input while preserving skip reasons for the report.
 - `src/review/batching.ts` applies centralized diff, file, batch, and reserved-context limits through `ReviewBudget`.
 - `src/review/batching.ts` exposes an explicit character-based budget with reserved prompt/response space while retaining the v0.1 legacy batching shape.
+- `src/review/reviewer.ts` processes batches with a four-worker pool, preserves input order, and stops scheduling new batches after a provider failure while allowing active calls to settle.
 - `src/ai/` contains the OpenAI SDK boundary. The rest of the review engine depends on the small `ReviewProvider` interface.
 - `src/review/schema.ts` validates every provider response before it enters the merge pipeline.
 - `src/report/` renders the final report without making claims that automated review is definitive.
