@@ -28,7 +28,7 @@ Pull request review often starts with the same context-gathering work: finding t
 - Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
 - Add repository-specific review rules and ignore paths without changing application code.
 - Reserve predictable prompt/response space with simple character-based context budget settings.
-- Run an opt-in GitHub Action that appends advisory reports to the Actions job summary.
+- Run an opt-in GitHub Action that appends a bounded advisory report to the Actions job summary.
 
 ## How It Works
 

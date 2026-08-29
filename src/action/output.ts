@@ -1,5 +1,6 @@
 import { appendFile, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { boundSummary } from './summary.js';
 
 export async function writeActionReport(
   report: string,
@@ -7,7 +8,7 @@ export async function writeActionReport(
   summaryPath?: string,
 ): Promise<void> {
   await writeFile(reportPath, report, 'utf8');
-  if (summaryPath) await appendFile(summaryPath, `${report.trimEnd()}\n`, 'utf8');
+  if (summaryPath) await appendFile(summaryPath, boundSummary(report), 'utf8');
 }
 
 export async function writeActionOutput(

@@ -94,7 +94,7 @@ The existing `.oss-pr-reviewer.yml` is loaded from the pull request base commit.
 
 ## Output and Limitations
 
-The full report is always appended to the Actions job summary. Comment mode reuses the report, applies a 60,000-character safety limit, preserves higher-priority findings when shortening, neutralizes mention-like text, and adds a truncation notice when needed. It does not create annotations or enforce a merge policy. Live GitHub/OpenAI credentials are not needed for repository tests, but a real Action run requires valid secrets and network access.
+The Action writes the complete report to its runner-temp report path and appends a deterministic summary capped at 900 KiB (UTF-8 bytes) to `GITHUB_STEP_SUMMARY`. When the cap is reached, the summary preserves the report header and prioritizes critical/high findings before lower-severity findings and supporting sections, then adds an explicit truncation notice. Comment mode reuses the report, applies a separate 60,000-character safety limit, preserves higher-priority findings when shortening, and neutralizes mention-like text. The Action does not upload the full report as an artifact or create annotations. Live GitHub/OpenAI credentials are not needed for repository tests, but a real Action run requires valid secrets and network access.
 
 ## Troubleshooting
 
