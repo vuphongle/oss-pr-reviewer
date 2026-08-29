@@ -58,10 +58,111 @@ describe('OpenAI provider boundary', () => {
       },
     } as unknown as OpenAI;
     await expect(
-      new OpenAiReviewProvider('secret-key', 'test-model', client).review({
+      new OpenAiReviewProvider('secret-key', 'test-model', client, { maxRetries: 0 }).review({
         pullRequest: pullRequestFixture,
         batch,
       }),
     ).rejects.toThrow(/rate limit/);
+  });
+
+  describe('retry behaviour', () => {
+    it('retries 429 responses up to the configured limit', async () => {
+      const create = vi
+        .fn()
+        .mockRejectedValueOnce({ status: 429, message: 'limit' })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ summary: 'ok', riskLevel: 'low', findings: [] }),
+              },
+            },
+          ],
+        });
+      const client = {
+        chat: { completions: { create } },
+      } as unknown as OpenAI;
+      const result = await new OpenAiReviewProvider('test-key', 'test-model', client, {
+        maxRetries: 2,
+        backoffMs: () => 0,
+      }).review({ pullRequest: pullRequestFixture, batch });
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(result.riskLevel).toBe('low');
+    });
+
+    it('retries 5xx responses up to the configured limit', async () => {
+      const create = vi
+        .fn()
+        .mockRejectedValueOnce({ status: 503, message: 'unavailable' })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ summary: 'ok', riskLevel: 'low', findings: [] }),
+              },
+            },
+          ],
+        });
+      const client = {
+        chat: { completions: { create } },
+      } as unknown as OpenAI;
+      await new OpenAiReviewProvider('test-key', 'test-model', client, {
+        maxRetries: 2,
+        backoffMs: () => 0,
+      }).review({ pullRequest: pullRequestFixture, batch });
+      expect(create).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry 4xx responses other than 429', async () => {
+      const create = vi.fn().mockRejectedValue({ status: 401, message: 'auth' });
+      const client = {
+        chat: { completions: { create } },
+      } as unknown as OpenAI;
+      await expect(
+        new OpenAiReviewProvider('test-key', 'test-model', client, {
+          maxRetries: 3,
+          backoffMs: () => 0,
+        }).review({ pullRequest: pullRequestFixture, batch }),
+      ).rejects.toThrow(/authentication/);
+      expect(create).toHaveBeenCalledOnce();
+    });
+
+    it('throws after exhausting retries', async () => {
+      const create = vi.fn().mockRejectedValue({ status: 429, message: 'limit' });
+      const client = {
+        chat: { completions: { create } },
+      } as unknown as OpenAI;
+      await expect(
+        new OpenAiReviewProvider('test-key', 'test-model', client, {
+          maxRetries: 2,
+          backoffMs: () => 0,
+        }).review({ pullRequest: pullRequestFixture, batch }),
+      ).rejects.toThrow(/rate limit/);
+      expect(create).toHaveBeenCalledTimes(3);
+    });
+
+    it('uses the supplied backoff scheduler between attempts', async () => {
+      const create = vi
+        .fn()
+        .mockRejectedValueOnce({ status: 429, message: 'limit' })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ summary: 'ok', riskLevel: 'low', findings: [] }),
+              },
+            },
+          ],
+        });
+      const client = {
+        chat: { completions: { create } },
+      } as unknown as OpenAI;
+      const backoffMs = vi.fn().mockReturnValue(0);
+      await new OpenAiReviewProvider('test-key', 'test-model', client, {
+        maxRetries: 1,
+        backoffMs,
+      }).review({ pullRequest: pullRequestFixture, batch });
+      expect(backoffMs).toHaveBeenCalledWith(1, expect.objectContaining({ status: 429 }));
+    });
   });
 });
