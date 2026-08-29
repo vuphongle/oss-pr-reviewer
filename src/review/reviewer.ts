@@ -13,6 +13,8 @@ export interface ReviewExecution {
   skippedFiles: SkippedFile[];
   reviewedFileCount: number;
   changedFileCount: number;
+  fileListStatus: 'complete' | 'incomplete';
+  truncatedFileCount: number;
   ignoredFileCount: number;
   batchCount: number;
 }
@@ -25,6 +27,12 @@ export async function reviewPullRequest(
   minimumSeverity: Severity = 'low',
   repositoryConfig: RepositoryConfig = DEFAULT_REPOSITORY_CONFIG,
 ): Promise<ReviewExecution> {
+  const truncatedFileCount = Math.max(
+    0,
+    pullRequest.changedFileCount - pullRequest.files.length,
+  );
+  const fileListStatus =
+    pullRequest.changedFileCount === pullRequest.files.length ? 'complete' : 'incomplete';
   const ignored = filterIgnoredFiles(pullRequest.files, repositoryConfig.ignore.paths);
   const normalized = normalizeFiles(ignored.files);
   const batched = createBatches(
@@ -42,7 +50,9 @@ export async function reviewPullRequest(
       },
       skippedFiles,
       reviewedFileCount: 0,
-      changedFileCount: pullRequest.files.length,
+      changedFileCount: pullRequest.changedFileCount,
+      fileListStatus,
+      truncatedFileCount,
       ignoredFileCount: ignored.skipped.length,
       batchCount: 0,
     };
@@ -77,7 +87,9 @@ export async function reviewPullRequest(
     result: { summary, riskLevel, findings },
     skippedFiles,
     reviewedFileCount: normalized.reviewable.length - batched.skipped.length,
-    changedFileCount: pullRequest.files.length,
+    changedFileCount: pullRequest.changedFileCount,
+    fileListStatus,
+    truncatedFileCount,
     ignoredFileCount: ignored.skipped.length,
     batchCount: batched.batches.length,
   };

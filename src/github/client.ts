@@ -57,6 +57,7 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
         title: pullResponse.data.title,
         body: pullResponse.data.body ?? '',
         baseSha: pullResponse.data.base.sha,
+        changedFileCount: pullResponse.data.changed_files,
         files: filesResponse.map((file) => ({
           path: file.filename,
           status: file.status,

@@ -18,6 +18,7 @@ export interface PullRequest {
   title: string;
   body: string;
   baseSha: string;
+  changedFileCount: number;
   files: ChangedFile[];
 }
 
@@ -71,6 +72,8 @@ export interface ReviewReportData {
   skippedFiles: SkippedFile[];
   reviewedFileCount: number;
   changedFileCount: number;
+  fileListStatus: 'complete' | 'incomplete';
+  truncatedFileCount: number;
   ignoredFileCount: number;
   batchCount: number;
 }

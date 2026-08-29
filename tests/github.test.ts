@@ -11,7 +11,7 @@ describe('GitHub client', () => {
     const octokit = {
       pulls: {
         get: vi.fn().mockResolvedValue({
-          data: { title: 'Title', body: null, base: { sha: 'base-sha' } },
+          data: { title: 'Title', body: null, base: { sha: 'base-sha' }, changed_files: 1 },
         }),
         listFiles: vi.fn(),
       },
@@ -36,8 +36,42 @@ describe('GitHub client', () => {
       number: 4,
       title: 'Title',
       body: '',
+      changedFileCount: 1,
     });
     expect(pullRequest.files[0]).toMatchObject({ path: 'src/a.ts', patch: '@@', additions: 2 });
+  });
+
+  it('retains the authoritative changed-file count when GitHub truncates the file list', async () => {
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockResolvedValue({
+          data: {
+            title: 'Large change',
+            body: '',
+            base: { sha: 'base-sha' },
+            changed_files: 3001,
+          },
+        }),
+        listFiles: vi.fn(),
+      },
+      paginate: vi.fn().mockResolvedValue([
+        {
+          filename: 'src/available.ts',
+          status: 'modified',
+          additions: 1,
+          deletions: 0,
+          patch: '+available',
+        },
+      ]),
+    };
+
+    const pullRequest = await new GithubClient({ octokit: octokit as never }).getPullRequest(
+      reference,
+      4,
+    );
+
+    expect(pullRequest.changedFileCount).toBe(3001);
+    expect(pullRequest.files).toHaveLength(1);
   });
 
   it('normalizes authentication, rate limit, and not-found failures', async () => {
