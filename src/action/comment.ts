@@ -9,8 +9,9 @@ export async function publishActionComment(
   event: PullRequestEvent,
   report: string,
   enabled: boolean,
+  reviewedHeadSha: string,
 ): Promise<PublishedReviewComment | undefined> {
   if (!enabled) return undefined;
   const parsed = parsePullRequestUrl(event.url);
-  return publishReviewComment(client, parsed.repository, event.number, report, event.headSha);
+  return publishReviewComment(client, parsed.repository, event.number, report, reviewedHeadSha);
 }

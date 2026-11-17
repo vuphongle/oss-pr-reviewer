@@ -141,6 +141,66 @@ describe('review context budgeting', () => {
     expect(createBatches(files, budget)).toEqual(result);
   });
 
+  it('splits renamed files so previous paths fit with metadata and guidance', () => {
+    const config = parseRepositoryConfig(
+      JSON.stringify({
+        version: 1,
+        context: { maxFilesPerBatch: 100, maxDiffCharacters: 500_000 },
+        rules: Array.from({ length: 5 }, (_, index) => ({
+          id: `rule-${index}`,
+          description: 'r'.repeat(3_980),
+        })),
+      }),
+    );
+    const budget = { ...DEFAULT_REVIEW_BUDGET, ...config.context };
+    const files = Array.from({ length: 70 }, (_, index) => ({
+      path: `new-${index}.ts`.padStart(230, 'n'),
+      previousPath: `old-${index}.ts`.padStart(235, 'o'),
+      status: 'renamed',
+      additions: 1,
+      deletions: 1,
+      patch: '@@ -1 +1 @@\n-old\n+' + 'x'.repeat(603),
+    }));
+    const pullRequest = { ...pullRequestFixture, body: 'b'.repeat(20_000), files };
+    const result = createBatches(files, budget);
+
+    for (const batch of result.batches) {
+      const prompt = buildReviewPrompt(pullRequest, batch, config.rules, budget);
+      for (const file of batch.files) {
+        expect(prompt).toContain(`PREVIOUS PATH: ${file.previousPath}`);
+      }
+      expect(
+        REVIEW_SYSTEM_PROMPT.length + prompt.length + budget.reservedResponseCharacters,
+      ).toBeLessThanOrEqual(budget.maxPromptCharacters!);
+    }
+    expect(result.batches.length).toBeGreaterThan(1);
+    expect(result.batches.flatMap((batch) => batch.files)).toEqual(files);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it('skips a renamed file whose previous path exceeds the prompt budget', () => {
+    const files = [
+      {
+        path: 'new.ts',
+        previousPath: 'p'.repeat(230),
+        status: 'renamed',
+        additions: 1,
+        deletions: 0,
+        patch: 'x',
+      },
+      { path: 'small.ts', status: 'modified', additions: 1, deletions: 0, patch: 'y' },
+    ];
+    const result = createBatches(files, {
+      ...DEFAULT_REVIEW_BUDGET,
+      maxPromptCharacters: 58_260,
+    });
+
+    expect(result.skipped).toEqual([
+      { path: 'new.ts', reason: 'rendered file exceeds 260 character prompt limit' },
+    ]);
+    expect(result.batches.flatMap((batch) => batch.files)).toEqual([files[1]]);
+  });
+
   it('skips a lone rendered file that cannot fit without dropping later files', () => {
     const files = [
       { path: 'p'.repeat(230), status: 'modified', additions: 1, deletions: 0, patch: 'x' },

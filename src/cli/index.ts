@@ -24,6 +24,7 @@ program
   .option('--output <path>', 'write report to a file instead of only stdout')
   .option('--output-format <format>', 'report format (markdown, json)', 'markdown')
   .option('--model <model-name>', 'OpenAI model name', 'gpt-4o-mini')
+  .option('--max-batches <number>', 'maximum total AI review batches (default: 20)', Number)
   .option('--min-severity <severity>', 'minimum finding severity (low, medium, high, critical)')
   .action(
     async (options: {
@@ -34,6 +35,7 @@ program
       outputFormat?: string;
       model?: string;
       minSeverity?: string;
+      maxBatches?: number;
     }) => {
       if (options.minSeverity && !severities.includes(options.minSeverity as Severity)) {
         throw new Error(
@@ -42,9 +44,7 @@ program
       }
       const outputFormat = options.outputFormat ?? 'markdown';
       if (outputFormat !== 'markdown' && outputFormat !== 'json') {
-        throw new Error(
-          `Unsupported output format '${outputFormat}'. Choose markdown or json.`,
-        );
+        throw new Error(`Unsupported output format '${outputFormat}'. Choose markdown or json.`);
       }
       const report = await executeReview({
         ...options,

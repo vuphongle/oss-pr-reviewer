@@ -70,7 +70,7 @@ function getRenderedDiffBudget(budget: ReviewBudget): number {
 export const REVIEW_FILE_SEPARATOR = '\n\n';
 
 export function renderReviewFile(file: ReviewableFile): string {
-  return `FILE: ${file.path}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`;
+  return `FILE: ${file.path}${file.previousPath ? `\nPREVIOUS PATH: ${file.previousPath}` : ''}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`;
 }
 
 export function createBatches(

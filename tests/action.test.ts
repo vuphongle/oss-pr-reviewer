@@ -330,6 +330,7 @@ describe('GitHub Action report output', () => {
         },
         '## Review',
         false,
+        'head-sha',
       ),
     ).resolves.toBeUndefined();
     expect(client.listComments).not.toHaveBeenCalled();
@@ -352,6 +353,7 @@ describe('GitHub Action report output', () => {
         },
         '## Review',
         true,
+        'head-sha',
       ),
     ).resolves.toEqual({ action: 'created', id: 22, htmlUrl: 'https://example.test/c/22' });
     expect(client.createComment).toHaveBeenCalledWith(
@@ -360,4 +362,35 @@ describe('GitHub Action report output', () => {
       `${OSS_PR_REVIEWER_MARKER}\n\n## Review`,
     );
   });
+});
+
+describe('Action reviewed SHA publication', () => {
+  const event = {
+    url: 'https://github.com/octo/project/pull/7',
+    number: 7,
+    isFork: false,
+    headSha: 'event-head',
+  };
+  it.each([
+    ['event-head', false],
+    ['reviewed-head', true],
+    ['newer-head', false],
+  ])(
+    'compares reviewed SHA with current %s regardless of event SHA',
+    async (current, publishes) => {
+      const client = {
+        listComments: vi.fn().mockResolvedValue([]),
+        createComment: vi.fn().mockResolvedValue({ id: 22 }),
+        getPullRequestHeadSha: vi.fn().mockResolvedValue(current),
+      };
+      await publishActionComment(
+        client as never,
+        event,
+        'Review of reviewed-head',
+        true,
+        'reviewed-head',
+      );
+      expect(client.createComment).toHaveBeenCalledTimes(publishes ? 1 : 0);
+    },
+  );
 });

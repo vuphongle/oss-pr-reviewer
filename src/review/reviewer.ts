@@ -1,4 +1,10 @@
-import type { PullRequest, ReviewResult, Severity, SkippedFile } from '../types.js';
+import type {
+  PullRequest,
+  RejectedFinding,
+  ReviewResult,
+  Severity,
+  SkippedFile,
+} from '../types.js';
 import type { RepositoryConfig } from '../config/repository.js';
 import { DEFAULT_REPOSITORY_CONFIG, getConfiguredReviewBudget } from '../config/repository.js';
 import { createBatches, DEFAULT_REVIEW_BUDGET } from './batching.js';
@@ -6,6 +12,7 @@ import type { ReviewBatch } from './batching.js';
 import { filterIgnoredFiles } from './ignore.js';
 import { normalizeFiles } from './normalize.js';
 import { deduplicateFindings, filterFindings, severityOrder } from './severity.js';
+import { validateFindings } from './validate.js';
 import type { ReviewProvider } from '../ai/provider.js';
 
 export interface ReviewExecution {
@@ -17,29 +24,38 @@ export interface ReviewExecution {
   truncatedFileCount: number;
   ignoredFileCount: number;
   batchCount: number;
+  rejectedFindings?: RejectedFinding[];
 }
 
 export const DEFAULT_REVIEW_CONCURRENCY = 4;
+export const DEFAULT_MAX_REVIEW_BATCHES = 20;
+
+export function validateMaxBatches(value: number): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error('max-batches must be a positive safe integer.');
+  }
+}
 
 export async function reviewPullRequest(
   pullRequest: PullRequest,
   provider: ReviewProvider,
   minimumSeverity: Severity = 'low',
   repositoryConfig: RepositoryConfig = DEFAULT_REPOSITORY_CONFIG,
+  maxBatches = DEFAULT_MAX_REVIEW_BATCHES,
 ): Promise<ReviewExecution> {
-  const truncatedFileCount = Math.max(
-    0,
-    pullRequest.changedFileCount - pullRequest.files.length,
-  );
+  validateMaxBatches(maxBatches);
+  const truncatedFileCount = Math.max(0, pullRequest.changedFileCount - pullRequest.files.length);
   const fileListStatus =
     pullRequest.changedFileCount === pullRequest.files.length ? 'complete' : 'incomplete';
   const ignored = filterIgnoredFiles(pullRequest.files, repositoryConfig.ignore.paths);
   const normalized = normalizeFiles(ignored.files);
   const reviewBudget = getConfiguredReviewBudget(repositoryConfig, DEFAULT_REVIEW_BUDGET);
-  const batched = createBatches(
-    normalized.reviewable,
-    reviewBudget,
-  );
+  const batched = createBatches(normalized.reviewable, reviewBudget);
+  if (batched.batches.length > maxBatches) {
+    throw new Error(
+      `Review requires ${batched.batches.length} batches, exceeding the ${maxBatches} batch limit. No provider requests were made. Narrow the diff or explicitly raise --max-batches.`,
+    );
+  }
   const skippedFiles = [...ignored.skipped, ...normalized.skipped, ...batched.skipped];
 
   if (batched.batches.length === 0) {
@@ -66,8 +82,12 @@ export async function reviewPullRequest(
     repositoryConfig.rules,
     reviewBudget,
   );
+  const validated = results.map((result, index) =>
+    validateFindings(result.findings, batched.batches[index]),
+  );
+  const rejectedFindings = validated.flatMap((result) => result.rejectedFindings);
   const findings = filterFindings(
-    deduplicateFindings(results.flatMap((result) => result.findings)),
+    deduplicateFindings(validated.flatMap((result) => result.findings)),
     minimumSeverity,
   );
   const riskLevel =
@@ -75,9 +95,7 @@ export async function reviewPullRequest(
       ? 'unknown'
       : findings.reduce<Severity>(
           (highest, finding) =>
-            severityOrder[finding.severity] > severityOrder[highest]
-              ? finding.severity
-              : highest,
+            severityOrder[finding.severity] > severityOrder[highest] ? finding.severity : highest,
           'low',
         );
   const summary = results
@@ -94,6 +112,7 @@ export async function reviewPullRequest(
     truncatedFileCount,
     ignoredFileCount: ignored.skipped.length,
     batchCount: batched.batches.length,
+    rejectedFindings,
   };
 }
 

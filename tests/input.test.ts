@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 
 import { parsePullRequestUrl, parseRepository } from '../src/github/types.js';
-import { executeReview } from '../src/cli/commands/review.js';
+import { executeReview, executeReviewWithMetadata } from '../src/cli/commands/review.js';
 import type { ReviewProvider } from '../src/ai/provider.js';
 import { pullRequestFixture, resultFixture } from './fixtures.js';
 
@@ -61,26 +61,30 @@ describe('CLI output format', () => {
     };
     const provider: ReviewProvider = { review: async () => resultFixture() };
     try {
-      const markdown = await executeReview(
-        {
-          repo: 'example/project',
-          pr: '12',
-          outputFormat: 'markdown',
-          github: github as never,
-          provider,
-        },
-      );
+      const markdown = await executeReview({
+        repo: 'example/project',
+        pr: '12',
+        outputFormat: 'markdown',
+        github: github as never,
+        provider,
+      });
       expect(markdown).toContain('# PR Review Report');
+      const structured = await executeReviewWithMetadata({
+        repo: 'example/project',
+        pr: '12',
+        github,
+        provider,
+      });
+      expect(structured.data.pullRequest.headSha).toBe(pullRequestFixture.headSha);
+      expect(structured.report).toBe(markdown);
 
-      const json = await executeReview(
-        {
-          repo: 'example/project',
-          pr: '12',
-          outputFormat: 'json',
-          github: github as never,
-          provider,
-        },
-      );
+      const json = await executeReview({
+        repo: 'example/project',
+        pr: '12',
+        outputFormat: 'json',
+        github: github as never,
+        provider,
+      });
       expect(() => JSON.parse(json)).not.toThrow();
       expect(JSON.parse(json).pullRequest.number).toBe(12);
     } finally {

@@ -8,8 +8,12 @@ import type { RepositoryFileReader } from '../../config/repository.js';
 import { parsePullRequestUrl, parseRepository } from '../../github/types.js';
 import { renderMarkdown } from '../../report/markdown.js';
 import { renderJson } from '../../report/json.js';
-import { reviewPullRequest } from '../../review/reviewer.js';
-import type { Severity } from '../../types.js';
+import {
+  DEFAULT_MAX_REVIEW_BATCHES,
+  reviewPullRequest,
+  validateMaxBatches,
+} from '../../review/reviewer.js';
+import type { ReviewReportData, Severity } from '../../types.js';
 import type { RepositoryConfig } from '../../config/repository.js';
 import { getConfiguredMinimumSeverity, loadRepositoryConfig } from '../../config/repository.js';
 
@@ -23,12 +27,21 @@ export interface ReviewCommandOptions {
   outputFormat?: ReportFormat;
   model?: string;
   minSeverity?: Severity;
+  maxBatches?: number;
   github?: Pick<GithubClient, 'getPullRequest'> & RepositoryFileReader;
   provider?: ReviewProvider;
 }
 
 export async function executeReview(options: ReviewCommandOptions): Promise<string> {
+  return (await executeReviewWithMetadata(options)).report;
+}
+
+export async function executeReviewWithMetadata(
+  options: ReviewCommandOptions,
+): Promise<{ report: string; data: ReviewReportData }> {
   const input = resolveInput(options);
+  const maxBatches = options.maxBatches ?? DEFAULT_MAX_REVIEW_BATCHES;
+  validateMaxBatches(maxBatches);
   const config = loadConfig();
   const openAiApiKey = requireOpenAiKey(config);
   const github = options.github ?? new GithubClient({ token: config.githubToken });
@@ -38,15 +51,16 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
     repository: pullRequest.repository,
     ref: pullRequest.baseSha,
   });
-  const provider =
-    options.provider ?? new OpenAiReviewProvider(openAiApiKey, options.model);
+  const provider = options.provider ?? new OpenAiReviewProvider(openAiApiKey, options.model);
   const execution = await reviewPullRequest(
     pullRequest,
     provider,
     resolveMinimumSeverity(options.minSeverity, repositoryConfig),
     repositoryConfig,
+    maxBatches,
   );
-  const report = renderReport({ pullRequest, ...execution }, options.outputFormat ?? 'markdown');
+  const data: ReviewReportData = { pullRequest, ...execution };
+  const report = renderReport(data, options.outputFormat ?? 'markdown');
 
   if (options.output) {
     try {
@@ -58,7 +72,7 @@ export async function executeReview(options: ReviewCommandOptions): Promise<stri
     }
   }
 
-  return report;
+  return { report, data };
 }
 
 export function renderReport(
