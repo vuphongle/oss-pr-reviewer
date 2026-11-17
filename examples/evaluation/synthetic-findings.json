@@ -1,0 +1,61 @@
+{
+  "pullRequest": {
+    "owner": "synthetic",
+    "repository": "fixture-only",
+    "number": 1,
+    "title": "SYNTHETIC account handler",
+    "body": "Hand-written scorer fixture; not a real PR or model response.",
+    "baseSha": "synthetic-base",
+    "headSha": "synthetic-head",
+    "changedFileCount": 1,
+    "files": [
+      {
+        "path": "src/account.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "patch": "@@ -10,0 +11,2 @@\n+const account = loadAccount(id);\n+return account;"
+      }
+    ]
+  },
+  "result": {
+    "summary": "SYNTHETIC scorer fixture with a duplicate and invalid anchor.",
+    "riskLevel": "high",
+    "findings": [
+      {
+        "severity": "high",
+        "category": "security",
+        "title": "Missing authorization check",
+        "file": "src/account.ts",
+        "line": 12,
+        "explanation": "SYNTHETIC: the changed handler accepts an account ID without checking its owner.",
+        "recommendation": "SYNTHETIC: check ownership before returning account data."
+      },
+      {
+        "severity": "high",
+        "category": "security",
+        "title": "Missing authorization check",
+        "file": "src/account.ts",
+        "line": 12,
+        "explanation": "SYNTHETIC: the changed handler accepts an account ID without checking its owner.",
+        "recommendation": "SYNTHETIC: check ownership before returning account data."
+      },
+      {
+        "severity": "high",
+        "category": "security",
+        "title": "Missing authorization check",
+        "file": "src/not-in-diff.ts",
+        "line": 99,
+        "explanation": "SYNTHETIC: the changed handler accepts an account ID without checking its owner.",
+        "recommendation": "SYNTHETIC: check ownership before returning account data."
+      }
+    ]
+  },
+  "skippedFiles": [],
+  "reviewedFileCount": 1,
+  "changedFileCount": 1,
+  "fileListStatus": "complete",
+  "truncatedFileCount": 0,
+  "ignoredFileCount": 0,
+  "batchCount": 1
+}

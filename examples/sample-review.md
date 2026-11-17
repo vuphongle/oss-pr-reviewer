@@ -1,5 +1,7 @@
 # PR Review Report
 
+> SYNTHETIC example only: not a real PR, model output, or confirmed vulnerability.
+
 ## Pull Request
 
 - Repository: example/payments-service
