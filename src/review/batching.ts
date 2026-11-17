@@ -51,15 +51,26 @@ export function budgetFromLegacyLimits(limits: typeof REVIEW_LIMITS): ReviewBudg
 export function getUsableDiffCharacters(budget: ReviewBudget): number {
   const diffBudget =
     budget.maxDiffCharacters - budget.reservedPromptCharacters - budget.reservedResponseCharacters;
-  const promptBudget =
+  const usable = Math.min(diffBudget, getRenderedDiffBudget(budget));
+  if (usable <= 0) throw new Error('Review budget must reserve less context than its maximum.');
+  return usable;
+}
+
+function getRenderedDiffBudget(budget: ReviewBudget): number {
+  return (
     (budget.maxPromptCharacters ?? DEFAULT_MAX_PROMPT_CHARACTERS) -
+    // Covers the system message and fixed prompt headers outside the bounded context.
     SYSTEM_PROMPT_CHARACTER_RESERVE -
     (budget.maxMetadataCharacters ?? DEFAULT_MAX_METADATA_CHARACTERS) -
     (budget.maxGuidanceCharacters ?? DEFAULT_MAX_GUIDANCE_CHARACTERS) -
-    budget.reservedResponseCharacters;
-  const usable = Math.min(diffBudget, promptBudget);
-  if (usable <= 0) throw new Error('Review budget must reserve less context than its maximum.');
-  return usable;
+    budget.reservedResponseCharacters
+  );
+}
+
+export const REVIEW_FILE_SEPARATOR = '\n\n';
+
+export function renderReviewFile(file: ReviewableFile): string {
+  return `FILE: ${file.path}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`;
 }
 
 export function createBatches(
@@ -77,9 +88,11 @@ export function createBatches(
           reservedResponseCharacters: 0,
         };
   const maxDiffCharacters = getUsableDiffCharacters(budget);
+  const maxRenderedDiffCharacters = getRenderedDiffBudget(budget);
   const batches: ReviewBatch[] = [];
   const skipped: SkippedFile[] = [];
   let current: ReviewBatch = { files: [], characterCount: 0 };
+  let renderedCharacterCount = 0;
 
   for (const file of files) {
     if (file.patch.length > budget.maxFileCharacters) {
@@ -98,13 +111,29 @@ export function createBatches(
       continue;
     }
 
-    const wouldExceedSize = current.characterCount + file.patch.length > maxDiffCharacters;
-    const wouldExceedFiles = current.files.length >= budget.maxFilesPerBatch;
-    if (current.files.length > 0 && (wouldExceedSize || wouldExceedFiles)) {
-      batches.push(current);
-      current = { files: [], characterCount: 0 };
+    const renderedFileCharacters = renderReviewFile(file).length;
+    if (renderedFileCharacters > maxRenderedDiffCharacters) {
+      skipped.push({
+        path: file.path,
+        reason: `rendered file exceeds ${maxRenderedDiffCharacters} character prompt limit`,
+      });
+      continue;
     }
 
+    const wouldExceedSize = current.characterCount + file.patch.length > maxDiffCharacters;
+    const separatorCharacters = current.files.length > 0 ? REVIEW_FILE_SEPARATOR.length : 0;
+    const wouldExceedPrompt =
+      renderedCharacterCount + separatorCharacters + renderedFileCharacters >
+      maxRenderedDiffCharacters;
+    const wouldExceedFiles = current.files.length >= budget.maxFilesPerBatch;
+    if (current.files.length > 0 && (wouldExceedSize || wouldExceedPrompt || wouldExceedFiles)) {
+      batches.push(current);
+      current = { files: [], characterCount: 0 };
+      renderedCharacterCount = 0;
+    }
+
+    renderedCharacterCount +=
+      (current.files.length > 0 ? REVIEW_FILE_SEPARATOR.length : 0) + renderedFileCharacters;
     current.files.push(file);
     current.characterCount += file.patch.length;
   }
