@@ -1,0 +1,33 @@
+{
+  "pullRequest": {
+    "owner": "synthetic",
+    "repository": "fixture-only",
+    "number": 2,
+    "title": "SYNTHETIC clean handler",
+    "body": "Hand-written scorer fixture; not a real PR or model response.",
+    "baseSha": "synthetic-base",
+    "headSha": "synthetic-clean-head",
+    "changedFileCount": 1,
+    "files": [
+      {
+        "path": "src/account.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "patch": "@@ -10,0 +11,2 @@\n+const account = loadAccount(id);\n+return account;"
+      }
+    ]
+  },
+  "result": {
+    "summary": "SYNTHETIC clean scorer fixture.",
+    "riskLevel": "unknown",
+    "findings": []
+  },
+  "skippedFiles": [],
+  "reviewedFileCount": 1,
+  "changedFileCount": 1,
+  "fileListStatus": "complete",
+  "truncatedFileCount": 0,
+  "ignoredFileCount": 0,
+  "batchCount": 1
+}
