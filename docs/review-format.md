@@ -1,33 +1,33 @@
-# Review Format
+# Review format and interpretation
 
-The CLI emits a structured report with pull request metadata, an overall summary and risk, findings, review statistics, skipped files, and an automation disclaimer. The report includes statistics such as files changed, files ignored by configuration, and review batches. The GitHub Action places the same report in the Actions job summary.
+The default Markdown report includes PR metadata and reviewed head, summary, risk, findings, file coverage, skipped reasons, and an advisory disclaimer. The Action appends a separately bounded rendering to its job summary; see [Action output limits](github-actions.md#output-and-limitations).
 
-By default the report is rendered as Markdown. `--output-format json` emits the same `ReviewReportData` shape as deterministic JSON for CI integration and downstream tooling. The JSON contains `pullRequest`, `result` (with `summary`, `riskLevel`, and `findings`), `skippedFiles`, and the same count fields as the Markdown statistics block. `fileListStatus` is `complete` or `incomplete`, while `truncatedFileCount` records changed files that GitHub did not return. Findings with `riskLevel: unknown` mean no review was performed (no reviewable patches or all findings filtered out).
+`--output-format json` serializes the current `ReviewReportData` object with two-space indentation and a final newline. It contains `pullRequest`, `result`, `skippedFiles`, `reviewedFileCount`, `changedFileCount`, `fileListStatus`, `truncatedFileCount`, `ignoredFileCount`, and `batchCount`. `result` contains `summary`, `riskLevel`, and `findings`.
 
-## Severity
+**The JSON currently includes the raw `pullRequest.body` and `pullRequest.files[].patch` data fetched from GitHub, including content that may have been excluded from AI input. It has no `schemaVersion`.** Treat saved JSON as potentially sensitive repository data, review it before sharing, and validate the fields your integration consumes. This is not a stable versioned interchange contract.
 
-- `unknown`: no review was performed for this pull request (no reviewable text patches, or every finding was filtered out by the minimum severity).
-- `critical`: evidence of a severe security, data-loss, or system-breaking issue.
-- `high`: a likely serious bug, security problem, regression, or breaking behavior.
-- `medium`: a meaningful correctness, test, error-handling, or maintainability concern.
-- `low`: a lower-impact issue that is still actionable and supported by the diff.
+## Empty findings and risk
 
-`--min-severity` is applied deterministically after provider responses are validated. The order is `unknown < low < medium < high < critical`. Findings cannot be reported at the `unknown` level.
+These are different outcomes:
 
-## Risk level
+| Outcome                                                        | Evidence in the current report                                                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| No reviewable patches                                          | `batchCount: 0`, `reviewedFileCount: 0`, and summary saying no reviewable text patches were available. No provider review ran. |
+| Patches reviewed; provider returned zero findings              | Positive batch/reviewed counts, no final findings. A review ran.                                                               |
+| Patches reviewed; every finding was below the minimum severity | Positive batch/reviewed counts, no final findings. A review ran and filtering removed its findings.                            |
 
-Risk is derived from the filtered findings, so a report with no surviving findings (no reviewable patches or every finding below `--min-severity`) reports `riskLevel: unknown`. When findings survive filtering, the final report uses the highest severity among them. Risk is an assessment of review context, not a guarantee about the pull request.
+All three currently produce `riskLevel: unknown`. Risk alone cannot tell them apart. The report does not retain pre-filter finding counts, so the latter two cannot be distinguished reliably from its structured fields. The Markdown sentence “No significant issues were identified in the reviewed diff” also appears for all empty-finding reports; check counts, skips, and coverage rather than treating this sentence as proof of review or correctness.
 
-## Categories
+Risk is the highest surviving finding severity, or `unknown` if none survive. It does not incorporate omitted context or establish merge readiness. `--min-severity` filters deterministically after validation and deduplication.
 
-Findings use one focused category: `bug`, `security`, `regression`, `breaking-change`, `tests`, `error-handling`, or `maintainability`.
+## Findings
 
-Each finding includes a title, file, optional line, evidence-based explanation, and recommendation. Duplicate findings with the same file, line, title, and category are removed.
+Severity is `critical`, `high`, `medium`, or `low`; findings cannot use `unknown`. Categories are `bug`, `security`, `regression`, `breaking-change`, `tests`, `error-handling`, and `maintainability`.
 
-## Interpretation
+Each finding contains `severity`, `category`, `title`, `file`, `line` (positive integer or `null`), `explanation`, and `recommendation`. Duplicate findings with the same file, line, title, and category are removed. Schema validation checks shape; it does not prove that a claim is correct. Maintainers should verify each file/line anchor against the exact reviewed head and check the source evidence. The [offline evaluator](evaluation.md) can check supplied anchor labels independently.
 
-Read findings as maintainer leads for further investigation. The model sees the pull request metadata, trusted-base repository guidance, and reviewable patches only. Missing context, truncated patches, generated files, binary files, deleted files, ignored files, and oversized content can limit accuracy. Automated output does not replace human review, testing, or a security audit.
+## Coverage and context
 
-GitHub returns at most 3,000 files from the pull-request files endpoint. The reviewer compares that response with GitHub's authoritative changed-file count. If files are unavailable, the report continues but displays a prominent incomplete-review warning and a separate unavailable-file count. Unavailable files are not represented as ordinary skipped files, and the tool does not imply that pagination recovered them.
+GitHub's files endpoint returns at most 3,000 changed files. When the returned count differs from the PR changed-file count, `fileListStatus` is `incomplete`. `truncatedFileCount` counts missing files, which are separate from ordinary skipped files. `complete` describes the file list, not semantic review completeness.
 
-Prompt context limits are enforced before each provider request. Oversized pull request metadata is truncated with an explicit note in the untrusted PR-content section. Repository guidance is validated per rule and in aggregate; guidance that exceeds its configured cap is rejected rather than silently omitted.
+Ignored paths, known binary extensions, missing patches, and oversized patches can reduce coverage. Deleted files with patches can still be reviewed. Oversized metadata is explicitly truncated in provider input; repository guidance that exceeds its configured cap is rejected. Read findings as leads to validate with source context and tests, not as a security audit or approval.

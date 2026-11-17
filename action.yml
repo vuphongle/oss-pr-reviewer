@@ -22,13 +22,13 @@ inputs:
 outputs:
   comment-action:
     description: Whether the comment was created, updated, or skipped.
-    value: ${{ steps.review.outputs.comment-action }}
+    value: ${{ steps.review.outputs['comment-action'] }}
   comment-id:
     description: ID of the created or updated comment, when comment mode is enabled.
-    value: ${{ steps.review.outputs.comment-id }}
+    value: ${{ steps.review.outputs['comment-id'] }}
   comment-url:
     description: URL of the created or updated comment, when available.
-    value: ${{ steps.review.outputs.comment-url }}
+    value: ${{ steps.review.outputs['comment-url'] }}
 runs:
   using: composite
   steps:

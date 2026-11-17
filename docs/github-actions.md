@@ -68,7 +68,7 @@ steps:
 | `min-severity`   | no       | repository config or `low` | Finding threshold. CLI/Action input overrides repository configuration.         |
 | `post-comment`   | no       | `false`                    | Create or update the owned PR comment. Requires `pull-requests: write`.         |
 
-The Action is advisory. A high or critical finding does not fail the job; configuration, API, or runtime failures do. If explicitly enabled comment publishing fails, the Action reports the error and exits non-zero after writing the complete job summary.
+The Action is advisory. A high or critical finding does not fail the job; configuration, API, or runtime failures do. If explicitly enabled comment publishing fails, the Action reports the error and exits non-zero after writing the bounded job summary and the full local report.
 
 ## Permissions and Secrets
 
@@ -80,7 +80,7 @@ permissions:
   pull-requests: read
 ```
 
-Store `OPENAI_API_KEY` as a repository or organization secret. The Action does not print secrets or place them in reports. Summary-only mode does not request write permissions; comment mode requires only `pull-requests: write` in addition to `contents: read`.
+Store `OPENAI_API_KEY` as a repository or organization secret. The Action redacts known credential values from errors, but reports can contain untrusted code-derived text; inspect them before sharing. Summary-only mode does not request write permissions; comment mode requires only `pull-requests: write` in addition to `contents: read`.
 
 The Action does not use `pull_request_target`. It runs the trusted Action checkout and does not check out or execute the reviewed contributor branch.
 
@@ -103,4 +103,4 @@ The Action writes the complete report to its runner-temp report path and appends
 - **Permission denied:** add `pull-requests: write` only when `post-comment: true`; keep `pull-requests: read` for summary-only mode.
 - **Fork pull request:** GitHub normally withholds repository secrets from `pull_request` workflows triggered by forks. Do not switch to `pull_request_target` as a workaround.
 - **Comment not created:** check that `post-comment` is exactly `true`, the token is available, and the workflow runs in the repository context with the documented permission.
-- **Shortened comment:** the complete report remains in the job summary; the PR comment is bounded for GitHub's practical comment limits.
+- **Shortened comment:** the comment and job summary have separate limits. The summary can also be truncated at 900 KiB; the full report exists only at the runner-temp report path and is not uploaded as an artifact.

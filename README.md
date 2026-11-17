@@ -1,164 +1,31 @@
 # oss-pr-reviewer
 
-AI-powered CLI for reviewing GitHub pull requests, detecting potential bugs, security risks, regressions, and missing tests, with structured Markdown reports for open-source maintainers.
+Review one GitHub pull request with OpenAI and save an advisory Markdown or JSON report. The CLI fetches PR metadata and patches, applies trusted base-commit rules and ignores, batches reviewable text, and validates and filters model findings. Maintainers decide what to fix or merge.
 
-## Overview
-
-`oss-pr-reviewer` assists a maintainer with a focused review of one GitHub pull request. It fetches pull request metadata and changed-file patches, normalizes reviewable content, splits large changes into deterministic batches, asks OpenAI for structured findings, validates and merges the responses, and writes a Markdown report.
-
-It is an assistant, not an approval system. It never claims that a pull request is guaranteed correct, secure, safe, or bug-free.
-
-## Why oss-pr-reviewer?
-
-Pull request review often starts with the same context-gathering work: finding the changed files, identifying patches that need human attention, and turning review notes into a shareable artifact. This CLI keeps that workflow local and explicit so maintainers can inspect the generated report and make the final decision themselves.
-
-## Features
-
-- Review by `--repo owner/repository --pr 123` or a GitHub pull request URL.
-- Fetch pull request metadata and changed files with Octokit.
-- Detect truncated GitHub file lists and mark the report explicitly incomplete.
-- Skip binary, patchless, and oversized files with reasons in the report.
-- Batch large text diffs with fixed limits: 60,000 characters, 30,000 characters per file, and 8 files per batch.
-- Limit provider calls to four concurrent review batches and preserve result ordering.
-- Validate OpenAI JSON responses with Zod.
-- Deduplicate identical findings and apply deterministic severity filtering.
-- Print Markdown to stdout or write it to `--output`.
-- Emit structured JSON output with `--output-format json` for CI integration.
-- Retry transient OpenAI and GitHub API failures (HTTP 429, 5xx) with exponential backoff.
-- Run lint, typecheck, tests, and build in GitHub Actions without live review secrets.
-- Configure the default minimum severity with a trusted base-branch `.oss-pr-reviewer.yml` file.
-- Add repository-specific review rules and ignore paths without changing application code.
-- Reserve predictable prompt/response space with simple character-based context budget settings.
-- Bound total prompt context, truncate oversized PR metadata with a note, and reject oversized repository guidance.
-- Run an opt-in GitHub Action that appends a bounded advisory report to the Actions job summary and publishes stale-safe comments.
-
-## How It Works
-
-```text
-Pull request -> GitHub fetch -> normalize -> batch -> AI analysis
-  -> validate -> merge/deduplicate/filter -> Markdown report
-```
-
-See [docs/architecture.md](docs/architecture.md) for module boundaries.
-
-## Installation
-
-The package requires Node.js 20 LTS or newer.
-
-From a checkout:
+Requires Node.js 20 or newer. The checkout is version 0.4.0; this repository has not published the package to npm. Use the built CLI from a checkout:
 
 ```bash
-npm install
+git clone https://github.com/vuphongle/oss-pr-reviewer.git
+cd oss-pr-reviewer
+npm ci
 npm run build
-```
-
-The v0.4.0 release is package-ready but is not published to npm by this repository yet. Run the CLI from the checkout with `node dist/cli/index.js`, or use `npm link` for a local global command:
-
-```bash
-npm link
-oss-pr-reviewer --help
-```
-
-## Quick Start
-
-```bash
-export GITHUB_TOKEN=...
-export OPENAI_API_KEY=...
-
-node dist/cli/index.js review \
-  --repo owner/repository \
-  --pr 123 \
-  --min-severity medium \
-  --output review.md
-```
-
-Live pull request review requires GitHub/OpenAI credentials. Development and automated tests do not.
-
-Authenticated GitHub access is recommended to avoid anonymous API rate limits. The CLI does not require a token for every public repository request, but GitHub may reject or limit unauthenticated access.
-
-## Configuration
-
-Copy `.env.example` to `.env` or provide environment variables directly:
-
-```bash
-GITHUB_TOKEN=
-OPENAI_API_KEY=
-```
-
-`OPENAI_API_KEY` is required for an AI review. Never commit `.env` or place real credentials in examples, issues, reports, or logs.
-
-### Repository configuration
-
-`oss-pr-reviewer` supports an optional `.oss-pr-reviewer.yml` file:
-
-```yaml
-version: 1
-
-review:
-  minSeverity: medium
-
-rules:
-  - id: require-tests
-    description: Changes under src/ should normally include corresponding tests.
-
-ignore:
-  paths:
-    - docs/**
-    - '**/*.generated.ts'
-```
-
-The file is loaded from the pull request's base commit, not the PR branch, so a PR cannot silently change the policy used to review itself. CLI options override repository configuration, and configuration overrides application defaults. Rule text is treated as untrusted review guidance. Ignored files are excluded before AI review and shown in the report's skipped-file information. See [docs/configuration.md](docs/configuration.md) and [examples/oss-pr-reviewer.yml](examples/oss-pr-reviewer.yml).
-
-## GitHub Actions
-
-v0.4.0 adds an opt-in composite Action for `pull_request` events. It reuses the CLI, reads the trusted base-branch configuration, and always appends the Markdown report to the job summary. The documented workflows cancel older runs per pull request. With `post-comment: true`, it also creates or updates one owned PR comment, includes the reviewed head SHA, and skips publication when the current head has changed.
-
-```yaml
-name: AI PR Review
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: read
-  pull-requests: read
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: vuphongle/oss-pr-reviewer@v0.4.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-```
-
-Comment mode requires `pull-requests: write`; summary-only mode needs only `pull-requests: read`. Live Action reviews require `OPENAI_API_KEY`; tests and local development do not. Fork pull requests normally cannot access repository secrets under `pull_request`, so do not switch to `pull_request_target` casually. See [docs/github-actions.md](docs/github-actions.md) for both workflow examples, permissions, inputs, security boundaries, and limitations.
-
-## CLI Usage
-
-```bash
-node dist/cli/index.js --help
-node dist/cli/index.js review --help
-
-node dist/cli/index.js review --repo owner/repository --pr 123
-node dist/cli/index.js review --url https://github.com/owner/repository/pull/123
-node dist/cli/index.js review --repo owner/repository --pr 123 --model gpt-4o-mini
-node dist/cli/index.js review --repo owner/repository --pr 123 --min-severity high
+export OPENAI_API_KEY=your-key
+export GITHUB_TOKEN=your-token
 node dist/cli/index.js review --repo owner/repository --pr 123 --output review.md
-node dist/cli/index.js review --repo owner/repository --pr 123 --output review.json --output-format json
 ```
 
-`--repo` and `--pr` must be supplied together. `--url` is mutually exclusive with that pair. Supported minimum severities are `low`, `medium`, `high`, and `critical`. A high or critical finding does not make the process fail; configuration, API, filesystem, and validation failures return a non-zero exit code.
+`OPENAI_API_KEY` is required for live reviews. GitHub authentication is recommended for public PRs and required where repository access demands it. Keep credentials out of source control. Development tests and the offline scorer require no credentials.
 
-## Sample Review Report
+```bash
+node dist/cli/index.js review --url https://github.com/owner/repository/pull/123
+node dist/cli/index.js review --repo owner/repository --pr 123 --min-severity high
+node dist/cli/index.js review --repo owner/repository --pr 123 --output-format json --output review.json
+node dist/cli/index.js review --help
+```
+
+A finding looks like this **synthetic example**, not a confirmed vulnerability:
 
 ```markdown
-# PR Review Report
-
-## Findings
-
 ### HIGH - Security
 
 **Missing authorization check**
@@ -166,54 +33,34 @@ node dist/cli/index.js review --repo owner/repository --pr 123 --output review.j
 File: `src/api/user.ts`
 Line: 84
 
-The changed endpoint does not appear to validate the caller's permissions.
+The changed handler returns user data without checking ownership.
 
 **Recommendation**
 
-Validate permissions before processing the request.
+Validate the caller's permission before returning the data.
 ```
 
-The full report also includes pull request metadata, summary, statistics, skipped files, and a disclaimer. See the synthetic example at [examples/sample-review.md](examples/sample-review.md) and [docs/review-format.md](docs/review-format.md).
+See the [sample report](examples/sample-review.md) and [report interpretation](docs/review-format.md). Finding severity does not change the exit code; configuration, API, validation, or filesystem failures do.
 
-## Architecture
+Important limits:
 
-The CLI depends on a small `ReviewProvider` interface, so the review engine does not contain OpenAI SDK details. The current release ships one provider: OpenAI. Review content, repository rules, and ignored-path configuration are treated as untrusted repository data; changed code is never executed. See [docs/architecture.md](docs/architecture.md).
+- The model sees supplied metadata, repository guidance, and patches, rather than the full repository. The CLI does not clone code or run tests.
+- Ignored, binary, patchless, oversized, or unavailable files reduce coverage. GitHub file-list truncation is reported as incomplete.
+- Default batches allow 8 files, 30,000 characters per patch, and **40,000 usable diff characters** after reserves. Budgets approximate characters, not tokens.
+- Empty findings and `riskLevel: unknown` do not establish correctness or prove that no review ran.
+- JSON currently includes raw PR body and patches and has no `schemaVersion`; inspect it before sharing.
+- Only OpenAI is implemented. Automated tests use mocks and do not establish model quality.
 
-## Review Philosophy
+The optional [GitHub Action](docs/github-actions.md) uses `pull_request` events, produces a bounded job summary, and can publish an owned comment with explicit write permission. Summary and comments can both be shortened; the full local report is not uploaded as an artifact. Fork PRs normally cannot access repository secrets.
 
-The prompt prioritizes correctness, regressions, security, breaking behavior, tests, error handling, and meaningful maintainability issues. It asks for evidence-based findings and excludes formatting complaints, naming preferences, stylistic nitpicks, speculation, and duplicates. Human maintainers remain responsible for validating context and deciding what to change or merge.
-
-## Security Considerations
-
-Keep tokens in the environment, use authenticated GitHub access where possible, and treat generated reports as potentially containing code-derived text. Repository content can contain prompt injection attempts; the system prompt explicitly treats it as data. The CLI does not clone the repository, execute code, or run shell commands derived from a pull request. See [SECURITY.md](SECURITY.md).
-
-## Limitations
-
-- Only OpenAI is implemented as a provider.
-- The tool reviews supplied pull request metadata and patches rather than the full repository.
-- GitHub returns at most 3,000 pull-request files. When its changed-file count is larger than the returned list, the report continues with an explicit incomplete status, warning, and unavailable-file count.
-- Missing, generated, binary, deleted, ignored, or oversized content can be skipped or reduce review context.
-- Context budgeting uses character approximations rather than exact model tokenization. The total cap includes the system prompt, PR metadata, repository guidance, diff, and reserved response space; metadata is explicitly truncated and oversized rules are rejected.
-- The GitHub Action does not create annotations or enforce a merge policy. Comment mode is bounded and advisory; the CLI does not clone repositories or run tests.
-- Comment publication is best-effort under concurrent runs: workflow cancellation and a current-head check reduce duplicates/stale overwrites, but GitHub comment creation has no atomic idempotency guarantee.
-- Live API usage requires network access and valid credentials; automated tests use mocks.
-
-## Development and Testing
+More detail: [configuration and defaults](docs/configuration.md), [architecture](docs/architecture.md), [security](SECURITY.md), [troubleshooting](docs/troubleshooting.md), [offline evaluation and measurement](docs/evaluation.md), and [contributing and release checklist](CONTRIBUTING.md).
 
 ```bash
-npm install
 npm run lint
 npm run typecheck
-npm run test
+npm test
 npm run build
+npm run evaluate -- examples/evaluation/synthetic-manifest.json
 ```
 
-Contributions should follow [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same quality gates on pushes and pull requests. Live API smoke testing remains a maintainer task because it requires credentials.
-
-## Roadmap
-
-Possible future directions include GitHub annotations and other maintainer-focused improvements informed by real-world usage.
-
-## License
-
-Released under the [MIT License](LICENSE).
+The final command scores hand-written synthetic reports to demonstrate the scorer; it makes no model-quality claim. Licensed under [MIT](LICENSE).

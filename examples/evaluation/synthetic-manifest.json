@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "provenance": "synthetic",
+  "cases": [
+    {
+      "id": "synthetic-duplicates-and-miss",
+      "report": "synthetic-findings.json",
+      "reviewedHead": "synthetic-head",
+      "validAnchors": [
+        {
+          "file": "src/account.ts",
+          "lines": [11, 12],
+          "allowFileLevel": true
+        }
+      ],
+      "expected": [
+        {
+          "id": "authorization",
+          "file": "src/account.ts",
+          "line": 12,
+          "category": "security",
+          "titleContains": "authorization"
+        },
+        {
+          "id": "missing-error-handling",
+          "file": "src/account.ts",
+          "line": 11,
+          "category": "error-handling",
+          "titleContains": "handle missing account"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-clean",
+      "report": "synthetic-clean.json",
+      "reviewedHead": "synthetic-clean-head",
+      "validAnchors": [
+        {
+          "file": "src/account.ts",
+          "lines": [11, 12]
+        }
+      ],
+      "expected": []
+    }
+  ]
+}

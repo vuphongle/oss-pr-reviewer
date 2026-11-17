@@ -12,7 +12,7 @@ describe('composite Action output contract', () => {
     };
     for (const output of ['comment-action', 'comment-id', 'comment-url']) {
       const binding = action.outputs[output].value;
-      const match = /^\$\{\{ steps\.([\w-]+)\.outputs\.([\w-]+) \}\}$/.exec(binding);
+      const match = /^\$\{\{ steps\.([\w-]+)\.outputs\['([\w-]+)'\] \}\}$/.exec(binding);
       expect(match, `${output} must bind a step output`).not.toBeNull();
       expect(match?.[2]).toBe(output);
       const writer = action.runs.steps.find((step) => step.id === match?.[1]);
