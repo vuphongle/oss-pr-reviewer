@@ -227,21 +227,16 @@ describe('review pipeline', () => {
         return resultFixture({ summary: `batch ${index}`, findings: [] });
       },
     };
-    const execution = await reviewPullRequest(
-      { ...pullRequestFixture, files },
-      provider,
-      'low',
-      {
-        ...DEFAULT_REPOSITORY_CONFIG,
-        context: {
-          maxFilesPerBatch: 1,
-          maxDiffCharacters: 10,
-          maxFileCharacters: 10,
-          reservedPromptCharacters: 0,
-          reservedResponseCharacters: 0,
-        },
+    const execution = await reviewPullRequest({ ...pullRequestFixture, files }, provider, 'low', {
+      ...DEFAULT_REPOSITORY_CONFIG,
+      context: {
+        maxFilesPerBatch: 1,
+        maxDiffCharacters: 10,
+        maxFileCharacters: 10,
+        reservedPromptCharacters: 0,
+        reservedResponseCharacters: 0,
       },
-    );
+    });
 
     expect(maxActive).toBeLessThanOrEqual(DEFAULT_REVIEW_CONCURRENCY);
     expect(execution.result.summary).toBe(
@@ -269,21 +264,16 @@ describe('review pipeline', () => {
     };
 
     await expect(
-      reviewPullRequest(
-        { ...pullRequestFixture, files },
-        provider,
-        'low',
-        {
-          ...DEFAULT_REPOSITORY_CONFIG,
-          context: {
-            maxFilesPerBatch: 1,
-            maxDiffCharacters: 10,
-            maxFileCharacters: 10,
-            reservedPromptCharacters: 0,
-            reservedResponseCharacters: 0,
-          },
+      reviewPullRequest({ ...pullRequestFixture, files }, provider, 'low', {
+        ...DEFAULT_REPOSITORY_CONFIG,
+        context: {
+          maxFilesPerBatch: 1,
+          maxDiffCharacters: 10,
+          maxFileCharacters: 10,
+          reservedPromptCharacters: 0,
+          reservedResponseCharacters: 0,
         },
-      ),
+      }),
     ).rejects.toThrow('provider failed');
     expect(calls.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });
