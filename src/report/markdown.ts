@@ -5,7 +5,9 @@ export function renderMarkdown(data: ReviewReportData): string {
   const counts = countFindings(result.findings);
   const findings =
     result.findings.length === 0
-      ? 'No significant issues were identified in the reviewed diff.'
+      ? data.rejectedFindings?.length
+        ? 'No findings with supported locations remain. Provider findings were rejected; maintainer review is required.'
+        : 'No significant issues were identified in the reviewed diff.'
       : result.findings.map(renderFinding).join('\n\n');
   const skipped =
     skippedFiles.length === 0
@@ -15,6 +17,11 @@ export function renderMarkdown(data: ReviewReportData): string {
     data.fileListStatus === 'incomplete'
       ? `\n> [!WARNING]\n> GitHub returned ${pullRequest.files.length} of ${data.changedFileCount} changed files. This review is incomplete: ${data.truncatedFileCount} files were unavailable and are not included in the skipped-files list.\n`
       : '';
+
+  const rejected = data.rejectedFindings ?? [];
+  const rejectionNotice = rejected.length
+    ? `\n> [!WARNING]\n> ${rejected.length} provider finding(s) were excluded because their locations could not be supported by the supplied batch. Location checks do not verify the correctness of retained findings.\n\n## Rejected Findings\n\n${rejected.map(({ finding, reason }) => `- \`${finding.file}\`${finding.line === null ? '' : `:${finding.line}`}: ${reason}`).join('\n')}\n`
+    : '';
 
   return `# PR Review Report
 
@@ -45,6 +52,7 @@ ${findings}
 - Files skipped: ${skippedFiles.length}
 - Review batches: ${data.batchCount}
 - Findings: ${result.findings.length}
+- Rejected findings: ${rejected.length}
 - Critical: ${counts.critical}
 - High: ${counts.high}
 - Medium: ${counts.medium}
@@ -53,7 +61,7 @@ ${findings}
 ## Skipped Files
 
 ${skipped}
-
+${rejectionNotice}
 > Automated AI review assists maintainer review; it does not replace human review, testing, or security auditing. Findings are based only on the supplied pull request context.
 `;
 }
@@ -63,7 +71,7 @@ function renderFinding(finding: ReviewFinding): string {
 
 **${finding.title}**
 
-File: \`${finding.file}\`${finding.line ? `\nLine: ${finding.line}` : ''}
+File: \`${finding.file}\`${finding.line ? `\nLine: ${finding.line}${finding.diffSide ? ` (${finding.diffSide} diff side)` : ''}` : ''}
 
 ${finding.explanation}
 

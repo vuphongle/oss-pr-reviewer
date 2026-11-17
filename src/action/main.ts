@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 
-import { executeReview } from '../cli/commands/review.js';
+import { executeReviewWithMetadata } from '../cli/commands/review.js';
 import { GithubClient } from '../github/client.js';
 import { parsePullRequestEvent } from './event.js';
 import { buildActionReviewOptions, parseActionInputs, redactSecrets } from './inputs.js';
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
   process.env.GITHUB_TOKEN = inputs.githubToken;
   process.env.OPENAI_API_KEY = inputs.openAiApiKey;
-  const report = await executeReview(buildActionReviewOptions(event, inputs));
+  const { report, data } = await executeReviewWithMetadata(buildActionReviewOptions(event, inputs));
   const reportPath = join(process.env.RUNNER_TEMP ?? process.cwd(), 'oss-pr-reviewer-report.md');
   await writeActionReport(report, reportPath, process.env.GITHUB_STEP_SUMMARY);
   const published = await publishActionComment(
@@ -35,6 +35,7 @@ async function main(): Promise<void> {
     event,
     report,
     inputs.postComment,
+    data.pullRequest.headSha,
   );
   await writeActionOutput(process.env.GITHUB_OUTPUT, {
     'comment-action': published?.action ?? 'skipped',

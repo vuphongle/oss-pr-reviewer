@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Octokit } from '@octokit/rest';
 import { Buffer } from 'node:buffer';
 
 import { GithubClient } from '../src/github/client.js';
@@ -153,7 +154,9 @@ describe('GitHub client', () => {
     const getContent = vi
       .fn()
       .mockRejectedValueOnce({ status: 502, message: 'bad gateway' })
-      .mockResolvedValueOnce({ data: { type: 'file', content: Buffer.from('ok').toString('base64') } });
+      .mockResolvedValueOnce({
+        data: { type: 'file', content: Buffer.from('ok').toString('base64') },
+      });
     const octokit = { repos: { getContent } } as never;
     await expect(
       new GithubClient({ octokit, retry: { maxRetries: 1, backoffMs: () => 0 } }).getFileAtRef(
@@ -234,4 +237,131 @@ describe('GitHub client', () => {
       body: 'updated',
     });
   });
+});
+
+describe('GitHub stable snapshot acquisition', () => {
+  const metadata = (head = 'head', base = 'base') => ({
+    data: { title: 'PR', body: '', head: { sha: head }, base: { sha: base }, changed_files: 1 },
+  });
+  const file = { filename: 'stable.ts', status: 'added', additions: 1, deletions: 0, patch: '+ok' };
+
+  it.each(['head', 'base'])(
+    'discards files when the %s changes during acquisition',
+    async (changed) => {
+      const first = metadata();
+      const stable = changed === 'head' ? metadata('next') : metadata('head', 'next');
+      const get = vi.fn().mockResolvedValueOnce(first).mockResolvedValue(stable);
+      const paginate = vi
+        .fn()
+        .mockResolvedValueOnce([{ ...file, filename: 'mixed.ts' }])
+        .mockResolvedValue([file]);
+      const octokit = { pulls: { get, listFiles: vi.fn() }, paginate };
+      const result = await new GithubClient({ octokit: octokit as never }).getPullRequest(
+        reference,
+        4,
+      );
+      expect(result.files.map(({ path }) => path)).toEqual(['stable.ts']);
+      expect(result.headSha).toBe(stable.data.head.sha);
+      expect(result.baseSha).toBe(stable.data.base.sha);
+      expect(get).toHaveBeenCalledTimes(4);
+      expect(paginate).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('fails after three changing snapshots instead of reviewing a mixed diff', async () => {
+    let revision = 0;
+    const get = vi.fn().mockImplementation(async () => metadata(String(revision++)));
+    const paginate = vi.fn().mockResolvedValue([file]);
+    const octokit = { pulls: { get, listFiles: vi.fn() }, paginate };
+    await expect(
+      new GithubClient({ octokit: octokit as never }).getPullRequest(reference, 4),
+    ).rejects.toThrow(/changed during file acquisition/);
+    expect(get).toHaveBeenCalledTimes(6);
+    expect(paginate).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries transient metadata and head reads but never blindly retries comment creation', async () => {
+    const get = vi.fn().mockRejectedValueOnce({ status: 502 }).mockResolvedValue(metadata());
+    const createComment = vi.fn().mockRejectedValue({ status: 502 });
+    const octokit = {
+      pulls: { get, listFiles: vi.fn() },
+      paginate: vi.fn().mockResolvedValue([file]),
+      issues: { createComment },
+    };
+    const client = new GithubClient({ octokit: octokit as never, retry: { backoffMs: () => 0 } });
+    await expect(client.getPullRequest(reference, 4)).resolves.toMatchObject({ headSha: 'head' });
+    get.mockRejectedValueOnce({ status: 502 });
+    await expect(client.getPullRequestHeadSha(reference, 4)).resolves.toBe('head');
+    expect(get).toHaveBeenCalledTimes(5);
+    await expect(client.createComment(reference, 4, 'report')).rejects.toThrow(
+      /temporarily unavailable/,
+    );
+    expect(createComment).toHaveBeenCalledOnce();
+  });
+});
+
+describe('native Octokit pagination retry', () => {
+  it.each(['files', 'comments'])(
+    'restarts %s pagination after a later page fails without duplicate results',
+    async (kind) => {
+      const pages: number[] = [];
+      let failed = false;
+      const octokit = new Octokit({
+        request: {
+          fetch: async (input: Parameters<typeof globalThis.fetch>[0]) => {
+            const url = new globalThis.URL(String(input));
+            if (url.pathname === '/repos/octo/project/pulls/4') {
+              return new globalThis.Response(
+                JSON.stringify({
+                  title: 'PR',
+                  base: { sha: 'base' },
+                  head: { sha: 'head' },
+                  changed_files: 2,
+                }),
+                { headers: { 'content-type': 'application/json' } },
+              );
+            }
+            const page = Number(url.searchParams.get('page') ?? 1);
+            pages.push(page);
+            if (page === 2 && !failed) {
+              failed = true;
+              return new globalThis.Response(JSON.stringify({ message: 'bad gateway' }), {
+                status: 502,
+                headers: { 'content-type': 'application/json' },
+              });
+            }
+            const data =
+              kind === 'files'
+                ? [
+                    {
+                      filename: `file-${page}.ts`,
+                      status: 'added',
+                      additions: 1,
+                      deletions: 0,
+                      patch: '+ok',
+                    },
+                  ]
+                : [{ id: page, body: `comment-${page}` }];
+            return new globalThis.Response(JSON.stringify(data), {
+              headers: {
+                'content-type': 'application/json',
+                ...(page === 1
+                  ? {
+                      link: `<https://api.github.com${url.pathname}?per_page=100&page=2>; rel="next"`,
+                    }
+                  : {}),
+              },
+            });
+          },
+        },
+      });
+      const client = new GithubClient({ octokit, retry: { maxRetries: 1, backoffMs: () => 0 } });
+      const results =
+        kind === 'files'
+          ? (await client.getPullRequest(reference, 4)).files
+          : await client.listComments(reference, 4);
+      expect(results).toHaveLength(2);
+      expect(pages).toEqual([1, 2, 1, 2]);
+    },
+  );
 });

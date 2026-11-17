@@ -57,8 +57,15 @@ export interface ReviewFinding {
   title: string;
   file: string;
   line: number | null;
+  /** Diff coordinate selected from supplied line evidence, not semantic verification. */
+  diffSide?: 'old' | 'new';
   explanation: string;
   recommendation: string;
+}
+
+export interface RejectedFinding {
+  finding: ReviewFinding;
+  reason: 'file-not-in-batch' | 'line-not-in-diff';
 }
 
 export interface ReviewResult {
@@ -77,4 +84,5 @@ export interface ReviewReportData {
   truncatedFileCount: number;
   ignoredFileCount: number;
   batchCount: number;
+  rejectedFindings?: RejectedFinding[];
 }
