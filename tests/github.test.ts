@@ -47,6 +47,14 @@ describe('GitHub client', () => {
       changedFileCount: 1,
     });
     expect(pullRequest.files[0]).toMatchObject({ path: 'src/a.ts', patch: '@@', additions: 2 });
+    expect(octokit.pulls.get).toHaveBeenCalledTimes(2);
+    expect(octokit.paginate).toHaveBeenCalledOnce();
+    expect(octokit.pulls.get.mock.invocationCallOrder[0]).toBeLessThan(
+      octokit.paginate.mock.invocationCallOrder[0]!,
+    );
+    expect(octokit.pulls.get.mock.invocationCallOrder[1]).toBeGreaterThan(
+      octokit.paginate.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('retains the authoritative changed-file count when GitHub truncates the file list', async () => {
@@ -83,6 +91,89 @@ describe('GitHub client', () => {
     expect(pullRequest.files).toHaveLength(1);
   });
 
+  it('fails closed when the pull request keeps changing during pagination', async () => {
+    const events: string[] = [];
+    let headVersion = 0;
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockImplementation(async () => {
+          events.push('metadata');
+          return {
+            data: {
+              title: 'Moving change',
+              body: '',
+              base: { sha: 'base-sha' },
+              head: { sha: `head-${headVersion}` },
+              changed_files: 2,
+            },
+          };
+        }),
+        listFiles: vi.fn().mockImplementation(async ({ page }: { page: number }) => {
+          events.push(`files-page-${page}`);
+          if (page === 2) headVersion += 1;
+          return {
+            data: [
+              {
+                filename: `src/from-head-${headVersion}.ts`,
+                status: 'modified',
+                additions: 1,
+                deletions: 0,
+                patch: `+head-${headVersion}`,
+              },
+            ],
+          };
+        }),
+      },
+      paginate: vi.fn().mockImplementation(async () => {
+        const firstPage = await octokit.pulls.listFiles({ page: 1 });
+        const secondPage = await octokit.pulls.listFiles({ page: 2 });
+        return [...firstPage.data, ...secondPage.data];
+      }),
+    };
+
+    const client = new GithubClient({ octokit: octokit as never });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await expect(client.getPullRequest(reference, 4)).rejects.toThrow(
+        'Pull request changed during file acquisition',
+      );
+      expect(octokit.paginate).toHaveBeenCalledTimes((attempt + 1) * 3);
+      expect(octokit.pulls.get).toHaveBeenCalledTimes((attempt + 1) * 6);
+    }
+    expect(events).toEqual(
+      Array.from({ length: 6 }, () => [
+        'metadata',
+        'files-page-1',
+        'files-page-2',
+        'metadata',
+      ]).flat(),
+    );
+  });
+
+  it('rejects file pages when the pull request base changes during pagination', async () => {
+    let baseVersion = 0;
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockImplementation(async () => ({
+          data: {
+            title: 'Moving base',
+            body: '',
+            base: { sha: `base-${baseVersion++}` },
+            head: { sha: 'head-sha' },
+            changed_files: 1,
+          },
+        })),
+        listFiles: vi.fn(),
+      },
+      paginate: vi.fn().mockResolvedValue([]),
+    };
+
+    await expect(
+      new GithubClient({ octokit: octokit as never }).getPullRequest(reference, 4),
+    ).rejects.toThrow('Pull request changed during file acquisition');
+    expect(octokit.pulls.get).toHaveBeenCalledTimes(6);
+    expect(octokit.paginate).toHaveBeenCalledTimes(3);
+  });
+
   it('normalizes authentication, rate limit, and not-found failures', async () => {
     for (const [status, message] of [
       [401, 'authentication'],
@@ -114,6 +205,174 @@ describe('GitHub client', () => {
       repo: 'project',
       pull_number: 4,
     });
+  });
+
+  describe.each(['metadata', 'files', 'current head'] as const)('%s retries', (read) => {
+    function setupRead(maxRetries = 2) {
+      const octokit = {
+        pulls: {
+          get: vi.fn().mockResolvedValue({
+            data: {
+              title: 'Title',
+              body: '',
+              base: { sha: 'base-sha' },
+              head: { sha: 'head-sha' },
+              changed_files: 1,
+            },
+          }),
+          listFiles: vi.fn(),
+        },
+        paginate: vi
+          .fn()
+          .mockResolvedValue([
+            { filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 0, patch: '+a' },
+          ]),
+      };
+      const backoffMs = vi.fn(() => 0);
+      const client = new GithubClient({
+        octokit: octokit as never,
+        retry: { maxRetries, backoffMs },
+      });
+      return {
+        operation: read === 'files' ? octokit.paginate : octokit.pulls.get,
+        backoffMs,
+        run: () =>
+          read === 'current head'
+            ? client.getPullRequestHeadSha(reference, 4)
+            : client.getPullRequest(reference, 4),
+      };
+    }
+
+    it.each([429, 502])('recovers from a transient %i response', async (status) => {
+      const { operation, backoffMs, run } = setupRead();
+      const error = { status, message: 'temporary failure' };
+      operation.mockRejectedValueOnce(error);
+
+      await expect(run()).resolves.toEqual(
+        read === 'current head'
+          ? 'head-sha'
+          : expect.objectContaining({
+              headSha: 'head-sha',
+              files: [expect.objectContaining({ path: 'src/a.ts', patch: '+a' })],
+            }),
+      );
+      expect(operation).toHaveBeenCalledTimes(read === 'metadata' ? 3 : 2);
+      expect(backoffMs).toHaveBeenCalledExactlyOnceWith(1, error);
+    });
+
+    it.each([
+      [401, 'authentication'],
+      [403, 'rate limiting'],
+      [404, 'not found'],
+      [422, 'invalid request'],
+    ] as const)('does not retry a non-retryable %i response', async (status, message) => {
+      const { operation, backoffMs, run } = setupRead();
+      operation.mockRejectedValue({ status, message: 'invalid request' });
+
+      await expect(run()).rejects.toThrow(message);
+      expect(operation).toHaveBeenCalledOnce();
+      expect(backoffMs).not.toHaveBeenCalled();
+    });
+
+    it.each([0, 2])('bounds exhausted retries with maxRetries=%i', async (maxRetries) => {
+      const { operation, backoffMs, run } = setupRead(maxRetries);
+      const error = { status: 503, message: 'service unavailable' };
+      operation.mockRejectedValue(error);
+
+      await expect(run()).rejects.toThrow('GitHub service is temporarily unavailable');
+      expect(operation).toHaveBeenCalledTimes(maxRetries + 1);
+      expect(backoffMs).toHaveBeenCalledTimes(maxRetries);
+      if (maxRetries > 0) {
+        expect(backoffMs).toHaveBeenNthCalledWith(1, 1, error);
+        expect(backoffMs).toHaveBeenNthCalledWith(2, 2, error);
+      }
+    });
+  });
+
+  it.each([false, true])(
+    'retries snapshot verification without accepting a changed head (changed=%s)',
+    async (changed) => {
+      const metadata = {
+        title: 'Title',
+        body: '',
+        base: { sha: 'base-sha' },
+        head: { sha: 'head-a' },
+        changed_files: 1,
+      };
+      const octokit = {
+        pulls: {
+          get: vi
+            .fn()
+            .mockResolvedValueOnce({ data: metadata })
+            .mockRejectedValueOnce({ status: 502 })
+            .mockResolvedValue({
+              data: { ...metadata, head: { sha: changed ? 'head-b' : 'head-a' } },
+            }),
+          listFiles: vi.fn(),
+        },
+        paginate: vi
+          .fn()
+          .mockResolvedValueOnce([
+            { filename: 'a.ts', status: 'modified', additions: 1, deletions: 0, patch: '+a' },
+          ])
+          .mockResolvedValue([
+            { filename: 'b.ts', status: 'modified', additions: 1, deletions: 0, patch: '+b' },
+          ]),
+      };
+      const operation = new GithubClient({
+        octokit: octokit as never,
+        retry: { maxRetries: 1, backoffMs: () => 0 },
+      }).getPullRequest(reference, 4);
+
+      await expect(operation).resolves.toMatchObject({
+        headSha: changed ? 'head-b' : 'head-a',
+        files: [expect.objectContaining({ path: changed ? 'b.ts' : 'a.ts' })],
+      });
+      expect(octokit.pulls.get).toHaveBeenCalledTimes(changed ? 5 : 3);
+      expect(octokit.paginate).toHaveBeenCalledTimes(changed ? 2 : 1);
+    },
+  );
+
+  it('reacquires files after a head change during a retried file-list request', async () => {
+    let headSha = 'head-a';
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockImplementation(async () => ({
+          data: {
+            title: 'Title',
+            body: '',
+            base: { sha: 'base-sha' },
+            head: { sha: headSha },
+            changed_files: 1,
+          },
+        })),
+        listFiles: vi.fn(),
+      },
+      paginate: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          headSha = 'head-b';
+          throw { status: 502 };
+        })
+        .mockResolvedValueOnce([
+          { filename: 'mixed.ts', status: 'modified', additions: 1, deletions: 0, patch: '+mixed' },
+        ])
+        .mockResolvedValue([
+          { filename: 'b.ts', status: 'modified', additions: 1, deletions: 0, patch: '+b' },
+        ]),
+    };
+
+    await expect(
+      new GithubClient({
+        octokit: octokit as never,
+        retry: { maxRetries: 1, backoffMs: () => 0 },
+      }).getPullRequest(reference, 4),
+    ).resolves.toMatchObject({
+      headSha: 'head-b',
+      files: [expect.objectContaining({ path: 'b.ts', patch: '+b' })],
+    });
+    expect(octokit.paginate).toHaveBeenCalledTimes(3);
+    expect(octokit.pulls.get).toHaveBeenCalledTimes(4);
   });
 
   it('reads and decodes a file from a trusted ref', async () => {

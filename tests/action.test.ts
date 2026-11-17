@@ -22,6 +22,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { URL } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 
 describe('GitHub Action inputs', () => {
   it('parses required credentials and optional review settings', () => {
@@ -209,6 +210,26 @@ describe('GitHub Action security documentation', () => {
     expect(action).toMatch(/comment-action:/);
     expect(action).toMatch(/comment-id:/);
     expect(action).toMatch(/comment-url:/);
+  });
+
+  it('maps every declared output to the composite review step', async () => {
+    const action: {
+      outputs: Record<string, { value: string }>;
+      runs: { steps: Array<{ id?: string; run?: string }> };
+    } = parseYaml(await readTextFile(new URL('../action.yml', import.meta.url), 'utf8'));
+
+    expect(
+      Object.fromEntries(
+        Object.entries(action.outputs).map(([name, output]) => [name, output.value]),
+      ),
+    ).toEqual({
+      'comment-action': "${{ steps.review.outputs['comment-action'] }}",
+      'comment-id': "${{ steps.review.outputs['comment-id'] }}",
+      'comment-url': "${{ steps.review.outputs['comment-url'] }}",
+    });
+    expect(action.runs.steps.find((step) => step.id === 'review')?.run).toContain(
+      'node "$ACTION_PATH/dist/action/main.js"',
+    );
   });
 });
 

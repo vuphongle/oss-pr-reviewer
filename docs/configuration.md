@@ -1,56 +1,53 @@
-# Repository Configuration
+# Repository configuration
 
-`oss-pr-reviewer` supports the optional `.oss-pr-reviewer.yml` file at the repository root. Configuration is read from the pull request's trusted base commit, not from the pull request head. This prevents a pull request from changing the review policy used to inspect its own changes. The same behavior is used by the GitHub Action.
-
-## Example
+The optional root `.oss-pr-reviewer.yml` is loaded from the PR's **base commit**, including in the Action. A PR cannot activate its own changed review policy. See the [example](../examples/oss-pr-reviewer.yml).
 
 ```yaml
 version: 1
-
 review:
   minSeverity: medium
-
 rules:
   - id: require-tests
     description: Changes under src/ should normally include corresponding tests.
-
 ignore:
   paths:
     - docs/**
     - '**/*.generated.ts'
-
 context:
-  maxFilesPerBatch: 10
-  maxPromptCharacters: 120000
-  maxMetadataCharacters: 20000
-  maxGuidanceCharacters: 24000
-  reservedResponseCharacters: 15000
+  maxFilesPerBatch: 8
 ```
 
-The currently supported settings are:
+CLI options override repository settings, which override defaults. With no file, minimum severity is `low`, rules and ignore patterns are empty, and the context defaults below apply. `version` must be `1`. Minimum severity accepts `low`, `medium`, `high`, or `critical`.
 
-- `version`: must be `1`.
-- `review.minSeverity`: optional `low`, `medium`, `high`, or `critical` value.
-- `rules`: optional list of stable kebab-case `id` values and non-empty review `description` text. Each description is limited to 4,000 characters and the combined rendered guidance is limited to 20,000 characters; oversized rules fail configuration validation.
-- `ignore.paths`: optional list of validated glob patterns. Matching files are not sent to the AI provider and are reported as ignored.
-- `context`: optional numeric context-budget overrides. Supported values are `maxFilesPerBatch`, `maxDiffCharacters`, `maxFileCharacters`, `reservedPromptCharacters`, `reservedResponseCharacters`, `maxPromptCharacters`, `maxMetadataCharacters`, and `maxGuidanceCharacters`. The total prompt cap includes the system prompt, bounded metadata, guidance, diff, and reserved response characters. Pull request metadata over its cap is truncated with an explicit note; guidance over its cap fails before the provider request.
+## Context defaults and valid ranges
 
-If the file is absent, v0.1 behavior is preserved and the default minimum severity is `low`. Invalid YAML, unsupported keys, unsupported versions, or invalid values fail the review with an actionable configuration error; they are not silently ignored.
+All values are integers measured in characters, except file count. Ranges are inclusive.
 
-## Precedence
+| Setting                      | Default | Valid range |
+| ---------------------------- | ------: | ----------: |
+| `maxFilesPerBatch`           |       8 |       1–100 |
+| `maxDiffCharacters`          |  60,000 |   1–500,000 |
+| `maxFileCharacters`          |  30,000 |   1–200,000 |
+| `reservedPromptCharacters`   |   8,000 |   0–100,000 |
+| `reservedResponseCharacters` |  12,000 |   0–100,000 |
+| `maxPromptCharacters`        | 120,000 |   1–500,000 |
+| `maxMetadataCharacters`      |  20,000 |   1–100,000 |
+| `maxGuidanceCharacters`      |  24,000 |   1–100,000 |
 
-For settings exposed by both interfaces, the value is selected in this order:
+The usable diff budget is the smaller of:
 
 ```text
-CLI option -> repository configuration -> application default
+maxDiffCharacters - reservedPromptCharacters - reservedResponseCharacters
+maxPromptCharacters - 2,000 system reserve - maxMetadataCharacters
+  - maxGuidanceCharacters - reservedResponseCharacters
 ```
 
-For example, `--min-severity high` overrides `review.minSeverity: medium`.
+Defaults therefore allow `min(60,000 - 8,000 - 12,000, 120,000 - 2,000 - 20,000 - 24,000 - 12,000) = 40,000` diff characters per batch. This is not a 60,000-character usable diff allowance. A nonpositive usable budget fails; an oversized individual patch is skipped, not split. Actual rendered prompt size plus response reserve is also checked before the provider request. Oversized metadata is truncated with a note; oversized guidance fails. Character counts do not predict model tokens or billing.
 
-## Security boundary
+## Rules, ignores, and validation
 
-Configuration is repository-defined guidance, not a system instruction. It cannot change prompt-injection protections, request secrets, execute commands, or override the review safety policy. Future configuration fields will be validated before they reach the review engine.
+`rules` accepts at most 100 entries. Each trimmed ID must be kebab-case and at most 128 characters; each trimmed description must contain 1–4,000 characters. Combined rendered `RULE id: description` guidance, including separators, is limited to 20,000 characters, independently of `maxGuidanceCharacters`.
 
-Custom rule descriptions are inserted into a clearly labeled untrusted guidance section in the review request. Path ignores are applied before unsupported-file normalization and batching.
+`ignore.paths` accepts nonempty glob patterns compiled with picomatch. Matching files are excluded **before** unsupported-file normalization and batching, and appear in skipped-file reporting. Generated files are not automatically ignored: configure paths explicitly.
 
-The context budget is character-based rather than tokenizer-based. The usable diff budget is constrained by the configured maximum diff size, reserved prompt/response characters, and the total prompt cap after reserving system, metadata, and guidance space. Files exceeding file or usable-diff limits are skipped with a reason; no token usage is fabricated.
+Invalid YAML, unsupported versions, unknown top-level keys, and invalid values fail validation. Use only the supported settings above and check nested key spelling. Rules are untrusted review guidance, not system instructions, and cannot execute code or grant access to secrets.
