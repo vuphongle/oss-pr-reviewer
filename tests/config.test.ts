@@ -29,6 +29,19 @@ describe('repository configuration', () => {
     expect(() => parseRepositoryConfig('version: 1\nunsupported: true')).toThrow(/unsupported/);
   });
 
+  it.each([
+    ['review', 'review:\n  minSeverty: high', 'minSeverty'],
+    ['ignore', 'ignore:\n  path: [docs/**]', 'path'],
+    ['context', 'context:\n  maxFilePerBatch: 1', 'maxFilePerBatch'],
+    [
+      'rules',
+      'rules:\n  - id: test-rule\n    description: Require tests.\n    severity: high',
+      'severity',
+    ],
+  ])('rejects unknown keys inside %s', (_section, yaml, key) => {
+    expect(() => parseRepositoryConfig(`version: 1\n${yaml}`)).toThrow(key);
+  });
+
   it('rejects malformed custom rules and ignore paths', () => {
     expect(() =>
       parseRepositoryConfig('version: 1\nrules:\n  - id: bad id\n    description: ok'),

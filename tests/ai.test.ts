@@ -65,6 +65,39 @@ describe('OpenAI provider boundary', () => {
     ).rejects.toThrow(/rate limit/);
   });
 
+  it.each([
+    ['length', { content: '{"summary":"partial"}' }, /output token limit/],
+    ['stop', { refusal: 'Policy explanation', content: null }, /refused/],
+    ['content_filter', { content: null }, /blocked/],
+    ['stop', { content: '   ' }, /empty/],
+  ])('reports unusable %s responses clearly', async (finishReason, message, expected) => {
+    const create = vi
+      .fn()
+      .mockResolvedValue({ choices: [{ finish_reason: finishReason, message }] });
+    const client = { chat: { completions: { create } } } as unknown as OpenAI;
+    await expect(
+      new OpenAiReviewProvider('test-key', 'test-model', client).review({
+        pullRequest: pullRequestFixture,
+        batch,
+      }),
+    ).rejects.toThrow(expected);
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('rejects invalid retry and request bounds', () => {
+    for (const options of [
+      { maxRetries: -1 },
+      { maxRetries: Number.NaN },
+      { timeoutMs: 0 },
+      { timeoutMs: Infinity },
+      { maxCompletionTokens: 0 },
+    ]) {
+      expect(() => new OpenAiReviewProvider('test-key', undefined, undefined, options)).toThrow(
+        /must be an integer/,
+      );
+    }
+  });
+
   describe('retry behaviour', () => {
     it('retries 429 responses up to the configured limit', async () => {
       const create = vi
