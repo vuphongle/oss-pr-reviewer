@@ -35,22 +35,28 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
 
   async getPullRequest(reference: RepositoryReference, number: number): Promise<PullRequest> {
     try {
-      const pullResponse = await this.octokit.pulls.get({
-        owner: reference.owner,
-        repo: reference.repository,
-        pull_number: number,
-      });
-      const filesResponse = await this.octokit.paginate(this.octokit.pulls.listFiles, {
-        owner: reference.owner,
-        repo: reference.repository,
-        pull_number: number,
-        per_page: 100,
-      });
-      const verifiedResponse = await this.octokit.pulls.get({
-        owner: reference.owner,
-        repo: reference.repository,
-        pull_number: number,
-      });
+      const pullResponse = await retry(this.maxRetries, this.backoffMs, () =>
+        this.octokit.pulls.get({
+          owner: reference.owner,
+          repo: reference.repository,
+          pull_number: number,
+        }),
+      );
+      const filesResponse = await retry(this.maxRetries, this.backoffMs, () =>
+        this.octokit.paginate(this.octokit.pulls.listFiles, {
+          owner: reference.owner,
+          repo: reference.repository,
+          pull_number: number,
+          per_page: 100,
+        }),
+      );
+      const verifiedResponse = await retry(this.maxRetries, this.backoffMs, () =>
+        this.octokit.pulls.get({
+          owner: reference.owner,
+          repo: reference.repository,
+          pull_number: number,
+        }),
+      );
       if (
         pullResponse.data.head.sha !== verifiedResponse.data.head.sha ||
         pullResponse.data.base.sha !== verifiedResponse.data.base.sha
@@ -83,11 +89,13 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
 
   async getPullRequestHeadSha(reference: RepositoryReference, number: number): Promise<string> {
     try {
-      const response = await this.octokit.pulls.get({
-        owner: reference.owner,
-        repo: reference.repository,
-        pull_number: number,
-      });
+      const response = await retry(this.maxRetries, this.backoffMs, () =>
+        this.octokit.pulls.get({
+          owner: reference.owner,
+          repo: reference.repository,
+          pull_number: number,
+        }),
+      );
       return response.data.head.sha;
     } catch (error) {
       throw normalizeGithubError(error);

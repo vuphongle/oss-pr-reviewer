@@ -216,6 +216,88 @@ describe('GitHub client', () => {
     });
   });
 
+  describe.each(['metadata', 'files', 'current head'] as const)('%s retries', (read) => {
+    function setupRead(maxRetries = 2) {
+      const octokit = {
+        pulls: {
+          get: vi.fn().mockResolvedValue({
+            data: {
+              title: 'Title',
+              body: '',
+              base: { sha: 'base-sha' },
+              head: { sha: 'head-sha' },
+              changed_files: 1,
+            },
+          }),
+          listFiles: vi.fn(),
+        },
+        paginate: vi
+          .fn()
+          .mockResolvedValue([
+            { filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 0, patch: '+a' },
+          ]),
+      };
+      const backoffMs = vi.fn(() => 0);
+      const client = new GithubClient({
+        octokit: octokit as never,
+        retry: { maxRetries, backoffMs },
+      });
+      return {
+        operation: read === 'files' ? octokit.paginate : octokit.pulls.get,
+        backoffMs,
+        run: () =>
+          read === 'current head'
+            ? client.getPullRequestHeadSha(reference, 4)
+            : client.getPullRequest(reference, 4),
+      };
+    }
+
+    it.each([429, 502])('recovers from a transient %i response', async (status) => {
+      const { operation, backoffMs, run } = setupRead();
+      const error = { status, message: 'temporary failure' };
+      operation.mockRejectedValueOnce(error);
+
+      await expect(run()).resolves.toEqual(
+        read === 'current head'
+          ? 'head-sha'
+          : expect.objectContaining({
+              headSha: 'head-sha',
+              files: [expect.objectContaining({ path: 'src/a.ts', patch: '+a' })],
+            }),
+      );
+      expect(operation).toHaveBeenCalledTimes(read === 'metadata' ? 3 : 2);
+      expect(backoffMs).toHaveBeenCalledExactlyOnceWith(1, error);
+    });
+
+    it.each([
+      [401, 'authentication'],
+      [403, 'rate limiting'],
+      [404, 'not found'],
+      [422, 'invalid request'],
+    ] as const)('does not retry a non-retryable %i response', async (status, message) => {
+      const { operation, backoffMs, run } = setupRead();
+      operation.mockRejectedValue({ status, message: 'invalid request' });
+
+      await expect(run()).rejects.toThrow(message);
+      expect(operation).toHaveBeenCalledOnce();
+      expect(backoffMs).not.toHaveBeenCalled();
+    });
+
+    it.each([0, 2])('bounds exhausted retries with maxRetries=%i', async (maxRetries) => {
+      const { operation, backoffMs, run } = setupRead(maxRetries);
+      const error = { status: 503, message: 'service unavailable' };
+      operation.mockRejectedValue(error);
+
+      await expect(run()).rejects.toThrow('GitHub service is temporarily unavailable');
+      expect(operation).toHaveBeenCalledTimes(maxRetries + 1);
+      expect(backoffMs).toHaveBeenCalledTimes(maxRetries);
+      if (maxRetries > 0) {
+        expect(backoffMs).toHaveBeenNthCalledWith(1, 1, error);
+        expect(backoffMs).toHaveBeenNthCalledWith(2, 2, error);
+      }
+    });
+  });
+
   it('reads and decodes a file from a trusted ref', async () => {
     const octokit = {
       repos: {
