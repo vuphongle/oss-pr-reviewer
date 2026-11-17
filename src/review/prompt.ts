@@ -5,6 +5,8 @@ import {
   DEFAULT_MAX_METADATA_CHARACTERS,
   DEFAULT_MAX_PROMPT_CHARACTERS,
   DEFAULT_REVIEW_BUDGET,
+  renderReviewFile,
+  REVIEW_FILE_SEPARATOR,
 } from './batching.js';
 import type { ReviewBudget } from './batching.js';
 import type { ReviewRule } from '../config/repository.js';
@@ -21,14 +23,11 @@ export function buildReviewPrompt(
   reviewRules: ReviewRule[] = [],
   budget: ReviewBudget = DEFAULT_REVIEW_BUDGET,
 ): string {
-  const files = batch.files
-    .map((file) => `FILE: ${file.path}\nSTATUS: ${file.status}\nPATCH:\n${file.patch}`)
-    .join('\n\n');
+  const files = batch.files.map(renderReviewFile).join(REVIEW_FILE_SEPARATOR);
   const guidance = reviewRules.length
     ? reviewRules.map((rule) => `RULE ${rule.id}: ${rule.description}`).join('\n')
     : '(none)';
-  const maxGuidanceCharacters =
-    budget.maxGuidanceCharacters ?? DEFAULT_MAX_GUIDANCE_CHARACTERS;
+  const maxGuidanceCharacters = budget.maxGuidanceCharacters ?? DEFAULT_MAX_GUIDANCE_CHARACTERS;
   if (guidance.length > maxGuidanceCharacters) {
     throw new Error(
       `Repository review guidance exceeds ${maxGuidanceCharacters} characters. Reduce or split the configured rules.`,
@@ -47,8 +46,7 @@ ${guidance}
 
 Changed files:
 ${files}`;
-  const maxPromptCharacters =
-    budget.maxPromptCharacters ?? DEFAULT_MAX_PROMPT_CHARACTERS;
+  const maxPromptCharacters = budget.maxPromptCharacters ?? DEFAULT_MAX_PROMPT_CHARACTERS;
   const totalCharacters =
     REVIEW_SYSTEM_PROMPT.length + prompt.length + budget.reservedResponseCharacters;
   if (totalCharacters > maxPromptCharacters) {

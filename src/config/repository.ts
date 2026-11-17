@@ -16,17 +16,20 @@ const repositoryConfigSchema = z
       .object({
         minSeverity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
       })
+      .strict()
       .default({}),
     rules: z
       .array(
-        z.object({
-          id: z
-            .string()
-            .trim()
-            .max(128)
-            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-          description: z.string().trim().min(1).max(MAX_RULE_DESCRIPTION_CHARACTERS),
-        }),
+        z
+          .object({
+            id: z
+              .string()
+              .trim()
+              .max(128)
+              .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+            description: z.string().trim().min(1).max(MAX_RULE_DESCRIPTION_CHARACTERS),
+          })
+          .strict(),
       )
       .max(100)
       .superRefine((rules, context) => {
@@ -50,6 +53,7 @@ const repositoryConfigSchema = z
           .array(z.string().trim().min(1).refine(isValidGlob, 'must be a valid glob pattern'))
           .default([]),
       })
+      .strict()
       .default({}),
     context: z
       .object({
@@ -62,6 +66,7 @@ const repositoryConfigSchema = z
         maxMetadataCharacters: z.number().int().positive().max(100_000).optional(),
         maxGuidanceCharacters: z.number().int().positive().max(100_000).optional(),
       })
+      .strict()
       .default({}),
   })
   .strict();

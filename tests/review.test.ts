@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { createBatches, REVIEW_LIMITS } from '../src/review/batching.js';
 import { normalizeFiles } from '../src/review/normalize.js';
 import { DEFAULT_REVIEW_CONCURRENCY, reviewPullRequest } from '../src/review/reviewer.js';
+import { buildReviewPrompt } from '../src/review/prompt.js';
 import { deduplicateFindings, filterFindings, severityOrder } from '../src/review/severity.js';
 import { findingFixture, pullRequestFixture, resultFixture } from './fixtures.js';
 import type { ReviewProvider } from '../src/ai/provider.js';
-import { DEFAULT_REPOSITORY_CONFIG } from '../src/config/repository.js';
+import { DEFAULT_REPOSITORY_CONFIG, parseRepositoryConfig } from '../src/config/repository.js';
 
 describe('severity and findings', () => {
   it('orders severities deterministically', () =>
@@ -159,8 +160,14 @@ describe('review pipeline', () => {
     expect(execution.result.riskLevel).toBe('critical');
   });
 
-  it('passes repository rules to the provider and reports ignored files', async () => {
-    const review = vi.fn().mockResolvedValue(resultFixture({ findings: [] }));
+  it('passes repository rules and only non-ignored files to the provider', async () => {
+    const prompts: string[] = [];
+    const review = vi.fn<ReviewProvider['review']>(async (input) => {
+      prompts.push(
+        buildReviewPrompt(input.pullRequest, input.batch, input.reviewRules, input.reviewBudget),
+      );
+      return resultFixture({ findings: [] });
+    });
     const provider: ReviewProvider = { review };
     const execution = await reviewPullRequest(
       {
@@ -178,11 +185,9 @@ describe('review pipeline', () => {
       },
       provider,
       'low',
-      {
-        ...DEFAULT_REPOSITORY_CONFIG,
-        rules: [{ id: 'require-tests', description: 'Changes to source need tests.' }],
-        ignore: { paths: ['src/api/**'] },
-      },
+      parseRepositoryConfig(
+        'version: 1\nrules:\n  - id: require-tests\n    description: Changes to source need tests.\nignore:\n  paths: [src/api/**]',
+      ),
     );
     expect(execution.skippedFiles).toContainEqual({
       path: 'src/api/account.ts',
@@ -190,9 +195,16 @@ describe('review pipeline', () => {
     });
     expect(review).toHaveBeenCalledWith(
       expect.objectContaining({
+        batch: expect.objectContaining({
+          files: [expect.objectContaining({ path: 'src/payment.ts' })],
+        }),
         reviewRules: [{ id: 'require-tests', description: 'Changes to source need tests.' }],
       }),
     );
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain('src/payment.ts');
+    expect(prompts[0]).not.toContain('src/api/account.ts');
+    expect(prompts[0]).not.toContain('database.get');
   });
 
   it('limits concurrent provider calls and preserves batch order', async () => {
@@ -215,21 +227,16 @@ describe('review pipeline', () => {
         return resultFixture({ summary: `batch ${index}`, findings: [] });
       },
     };
-    const execution = await reviewPullRequest(
-      { ...pullRequestFixture, files },
-      provider,
-      'low',
-      {
-        ...DEFAULT_REPOSITORY_CONFIG,
-        context: {
-          maxFilesPerBatch: 1,
-          maxDiffCharacters: 10,
-          maxFileCharacters: 10,
-          reservedPromptCharacters: 0,
-          reservedResponseCharacters: 0,
-        },
+    const execution = await reviewPullRequest({ ...pullRequestFixture, files }, provider, 'low', {
+      ...DEFAULT_REPOSITORY_CONFIG,
+      context: {
+        maxFilesPerBatch: 1,
+        maxDiffCharacters: 10,
+        maxFileCharacters: 10,
+        reservedPromptCharacters: 0,
+        reservedResponseCharacters: 0,
       },
-    );
+    });
 
     expect(maxActive).toBeLessThanOrEqual(DEFAULT_REVIEW_CONCURRENCY);
     expect(execution.result.summary).toBe(
@@ -257,21 +264,16 @@ describe('review pipeline', () => {
     };
 
     await expect(
-      reviewPullRequest(
-        { ...pullRequestFixture, files },
-        provider,
-        'low',
-        {
-          ...DEFAULT_REPOSITORY_CONFIG,
-          context: {
-            maxFilesPerBatch: 1,
-            maxDiffCharacters: 10,
-            maxFileCharacters: 10,
-            reservedPromptCharacters: 0,
-            reservedResponseCharacters: 0,
-          },
+      reviewPullRequest({ ...pullRequestFixture, files }, provider, 'low', {
+        ...DEFAULT_REPOSITORY_CONFIG,
+        context: {
+          maxFilesPerBatch: 1,
+          maxDiffCharacters: 10,
+          maxFileCharacters: 10,
+          reservedPromptCharacters: 0,
+          reservedResponseCharacters: 0,
         },
-      ),
+      }),
     ).rejects.toThrow('provider failed');
     expect(calls.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });

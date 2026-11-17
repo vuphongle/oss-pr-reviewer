@@ -1,7 +1,10 @@
+import process from 'node:process';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadRepositoryConfig, parseRepositoryConfig } from '../src/config/repository.js';
-import { resolveMinimumSeverity } from '../src/cli/commands/review.js';
+import { executeReview, resolveMinimumSeverity } from '../src/cli/commands/review.js';
+import { pullRequestFixture, resultFixture } from './fixtures.js';
 
 describe('repository configuration', () => {
   it('parses a versioned minimum severity configuration', () => {
@@ -27,6 +30,32 @@ describe('repository configuration', () => {
 
   it('rejects unknown configuration keys', () => {
     expect(() => parseRepositoryConfig('version: 1\nunsupported: true')).toThrow(/unsupported/);
+  });
+
+  it.each([
+    {
+      object: 'review',
+      content: 'version: 1\nreview:\n  minSeverty: high',
+      error: /review .*minSeverty/,
+    },
+    {
+      object: 'ignore',
+      content: 'version: 1\nignore:\n  path: [private/**]',
+      error: /ignore .*path/,
+    },
+    {
+      object: 'context',
+      content: 'version: 1\ncontext:\n  maxFilesPerBach: 10',
+      error: /context .*maxFilesPerBach/,
+    },
+    {
+      object: 'rule entry',
+      content:
+        'version: 1\nrules:\n  - id: require-tests\n    description: Changes need tests.\n    descriptin: Misspelled guidance.',
+      error: /rules\.0 .*descriptin/,
+    },
+  ])('rejects misspelled keys in $object with their object path', ({ content, error }) => {
+    expect(() => parseRepositoryConfig(content)).toThrow(error);
   });
 
   it('rejects malformed custom rules and ignore paths', () => {
@@ -81,6 +110,25 @@ describe('repository configuration', () => {
     await expect(
       loadRepositoryConfig(reader, { owner: 'octo', repository: 'project', ref: 'base-sha' }),
     ).rejects.toThrow(/configuration/);
+  });
+
+  it('rejects a misspelled trusted ignore key before invoking the provider', async () => {
+    const previousKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = 'test-key';
+    const review = vi.fn().mockResolvedValue(resultFixture());
+    const github = {
+      getPullRequest: vi.fn().mockResolvedValue(pullRequestFixture),
+      getFileAtRef: vi.fn().mockResolvedValue('version: 1\nignore:\n  path: [private/**]'),
+    };
+    try {
+      await expect(
+        executeReview({ repo: 'example/project', pr: '12', github, provider: { review } }),
+      ).rejects.toThrow(/ignore .*path/);
+      expect(review).not.toHaveBeenCalled();
+    } finally {
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+    }
   });
 
   it('gives an explicit CLI value precedence over repository configuration', () => {
