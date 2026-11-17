@@ -19,8 +19,7 @@ interface GithubClientOptions {
 }
 
 const DEFAULT_MAX_RETRIES = 2;
-const exponentialBackoff = (attempt: number): number =>
-  Math.min(1000 * 2 ** (attempt - 1), 8000);
+const exponentialBackoff = (attempt: number): number => Math.min(1000 * 2 ** (attempt - 1), 8000);
 
 export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
   private readonly octokit: Octokit;
@@ -36,19 +35,28 @@ export class GithubClient implements RepositoryFileReader, ReviewCommentClient {
 
   async getPullRequest(reference: RepositoryReference, number: number): Promise<PullRequest> {
     try {
-      const [pullResponse, filesResponse] = await Promise.all([
-        this.octokit.pulls.get({
-          owner: reference.owner,
-          repo: reference.repository,
-          pull_number: number,
-        }),
-        this.octokit.paginate(this.octokit.pulls.listFiles, {
-          owner: reference.owner,
-          repo: reference.repository,
-          pull_number: number,
-          per_page: 100,
-        }),
-      ]);
+      const pullResponse = await this.octokit.pulls.get({
+        owner: reference.owner,
+        repo: reference.repository,
+        pull_number: number,
+      });
+      const filesResponse = await this.octokit.paginate(this.octokit.pulls.listFiles, {
+        owner: reference.owner,
+        repo: reference.repository,
+        pull_number: number,
+        per_page: 100,
+      });
+      const verifiedResponse = await this.octokit.pulls.get({
+        owner: reference.owner,
+        repo: reference.repository,
+        pull_number: number,
+      });
+      if (
+        pullResponse.data.head.sha !== verifiedResponse.data.head.sha ||
+        pullResponse.data.base.sha !== verifiedResponse.data.base.sha
+      ) {
+        throw new Error('Pull request changed while retrieving files. Retry the review.');
+      }
 
       return {
         owner: reference.owner,

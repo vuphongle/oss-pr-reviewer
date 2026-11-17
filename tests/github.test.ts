@@ -46,6 +46,14 @@ describe('GitHub client', () => {
       changedFileCount: 1,
     });
     expect(pullRequest.files[0]).toMatchObject({ path: 'src/a.ts', patch: '@@', additions: 2 });
+    expect(octokit.pulls.get).toHaveBeenCalledTimes(2);
+    expect(octokit.paginate).toHaveBeenCalledOnce();
+    expect(octokit.pulls.get.mock.invocationCallOrder[0]).toBeLessThan(
+      octokit.paginate.mock.invocationCallOrder[0]!,
+    );
+    expect(octokit.pulls.get.mock.invocationCallOrder[1]).toBeGreaterThan(
+      octokit.paginate.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('retains the authoritative changed-file count when GitHub truncates the file list', async () => {
@@ -80,6 +88,99 @@ describe('GitHub client', () => {
 
     expect(pullRequest.changedFileCount).toBe(3001);
     expect(pullRequest.files).toHaveLength(1);
+  });
+
+  it('fails closed when the pull request keeps changing during pagination', async () => {
+    const events: string[] = [];
+    let headVersion = 0;
+    const octokit = {
+      pulls: {
+        get: vi.fn().mockImplementation(async () => {
+          events.push('metadata');
+          return {
+            data: {
+              title: 'Moving change',
+              body: '',
+              base: { sha: 'base-sha' },
+              head: { sha: `head-${headVersion}` },
+              changed_files: 2,
+            },
+          };
+        }),
+        listFiles: vi.fn().mockImplementation(async ({ page }: { page: number }) => {
+          events.push(`files-page-${page}`);
+          if (page === 2) headVersion += 1;
+          return {
+            data: [
+              {
+                filename: `src/from-head-${headVersion}.ts`,
+                status: 'modified',
+                additions: 1,
+                deletions: 0,
+                patch: `+head-${headVersion}`,
+              },
+            ],
+          };
+        }),
+      },
+      paginate: vi.fn().mockImplementation(async () => {
+        const firstPage = await octokit.pulls.listFiles({ page: 1 });
+        const secondPage = await octokit.pulls.listFiles({ page: 2 });
+        return [...firstPage.data, ...secondPage.data];
+      }),
+    };
+
+    const client = new GithubClient({ octokit: octokit as never });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await expect(client.getPullRequest(reference, 4)).rejects.toThrow(
+        'Pull request changed while retrieving files',
+      );
+      expect(octokit.paginate).toHaveBeenCalledTimes(attempt + 1);
+      expect(octokit.pulls.get).toHaveBeenCalledTimes((attempt + 1) * 2);
+    }
+    expect(events).toEqual([
+      'metadata',
+      'files-page-1',
+      'files-page-2',
+      'metadata',
+      'metadata',
+      'files-page-1',
+      'files-page-2',
+      'metadata',
+    ]);
+  });
+
+  it('rejects file pages when the pull request base changes during pagination', async () => {
+    const octokit = {
+      pulls: {
+        get: vi
+          .fn()
+          .mockResolvedValueOnce({
+            data: {
+              title: 'Moving base',
+              body: '',
+              base: { sha: 'base-a' },
+              head: { sha: 'head-sha' },
+              changed_files: 1,
+            },
+          })
+          .mockResolvedValueOnce({
+            data: {
+              title: 'Moving base',
+              body: '',
+              base: { sha: 'base-b' },
+              head: { sha: 'head-sha' },
+              changed_files: 1,
+            },
+          }),
+        listFiles: vi.fn(),
+      },
+      paginate: vi.fn().mockResolvedValue([]),
+    };
+
+    await expect(
+      new GithubClient({ octokit: octokit as never }).getPullRequest(reference, 4),
+    ).rejects.toThrow('Pull request changed while retrieving files');
   });
 
   it('normalizes authentication, rate limit, and not-found failures', async () => {
@@ -153,7 +254,9 @@ describe('GitHub client', () => {
     const getContent = vi
       .fn()
       .mockRejectedValueOnce({ status: 502, message: 'bad gateway' })
-      .mockResolvedValueOnce({ data: { type: 'file', content: Buffer.from('ok').toString('base64') } });
+      .mockResolvedValueOnce({
+        data: { type: 'file', content: Buffer.from('ok').toString('base64') },
+      });
     const octokit = { repos: { getContent } } as never;
     await expect(
       new GithubClient({ octokit, retry: { maxRetries: 1, backoffMs: () => 0 } }).getFileAtRef(
